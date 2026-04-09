@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏰 astrbot_plugin_rocom
+# 本仓库正在构建，请勿下载使用
 ### *WeGame 洛克王国数据查询 AstrBot 版*
 
 [![GitHub stars](https://img.shields.io/github/stars/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge&color=FFc65f)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/stargazers)
