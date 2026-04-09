@@ -1,0 +1,326 @@
+"""
+HTML → 图片渲染器
+
+基于 Playwright 截图，将 art-template 语法模板转为 Jinja2 后渲染。
+复用 endfield 插件的 Renderer 架构，适配洛克王国模板。
+"""
+
+import os
+import re
+import asyncio
+import base64
+import mimetypes
+import uuid
+import jinja2
+from typing import Dict, Any, Optional
+from astrbot.api import logger
+
+
+class Renderer:
+    """洛克王国 HTML→图片渲染器"""
+
+    _jinja_env: Optional[jinja2.Environment] = None
+    _cache_cleanup_task: Optional[asyncio.Task] = None
+
+    @classmethod
+    def _get_jinja_env(cls) -> jinja2.Environment:
+        if cls._jinja_env is None:
+            cls._jinja_env = jinja2.Environment(
+                autoescape=True,
+                keep_trailing_newline=True,
+            )
+        return cls._jinja_env
+
+    def __init__(self, res_path: str, render_timeout: int = 30000):
+        self.res_path = res_path
+        self.render_timeout = render_timeout
+        self._browser = None
+        self._playwright = None
+        self._lock = asyncio.Lock()
+        self._output_dir = os.path.abspath(
+            os.path.join(self.res_path, "render_cache")
+        )
+        os.makedirs(self._output_dir, exist_ok=True)
+
+        if Renderer._cache_cleanup_task is None or Renderer._cache_cleanup_task.done():
+            Renderer._cache_cleanup_task = asyncio.create_task(
+                self._cache_cleanup_loop()
+            )
+
+    async def _cache_cleanup_loop(self):
+        """后台清理超过 5 分钟的渲染缓存"""
+        while True:
+            try:
+                await asyncio.sleep(60)
+                import time as _time
+                now = _time.time()
+                for f in os.listdir(self._output_dir):
+                    if not f.startswith("render_"):
+                        continue
+                    fp = os.path.join(self._output_dir, f)
+                    try:
+                        if now - os.path.getmtime(fp) > 300:
+                            os.remove(fp)
+                    except Exception:
+                        pass
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                pass
+
+    def get_template(self, name: str) -> str:
+        path = os.path.join(self.res_path, name)
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        return ""
+
+    async def render_html(
+        self,
+        template_name: str,
+        data: Dict[str, Any],
+        options: Optional[Dict] = None,
+    ) -> Optional[str]:
+        """渲染 HTML 模板为图片，返回图片路径"""
+        tmpl_content = self.get_template(template_name)
+        if not tmpl_content:
+            logger.error(f"[Rocom Render] 模板不存在: {template_name}")
+            return None
+
+        adapted = self._adapt_template(tmpl_content)
+        adapted = self._inline_assets(adapted)
+        html_content = self._render_jinja(adapted, data)
+        if not html_content:
+            return None
+
+        return await self._screenshot(html_content, template_name, options)
+
+    def _adapt_template(self, content: str) -> str:
+        """将 art-template 语法转换为 Jinja2"""
+        # $index / $value
+        adapted = content.replace("$index+1", "loop.index").replace(
+            "$index", "loop.index0"
+        )
+        adapted = adapted.replace("$value", "item")
+
+        def fix_condition(match):
+            cond = (
+                match.group(1)
+                .replace("===", "==")
+                .replace("!==", "!=")
+                .replace("&&", " and ")
+                .replace("||", " or ")
+                .replace("null", "none")
+                .replace(".length", "|length")
+            )
+            cond = re.sub(r"!\s*([\w\.]+)", r"not \1", cond)
+            return f"{{% if {cond} %}}"
+
+        adapted = re.sub(r"\{\{if\s+(.+?)\}\}", fix_condition, adapted)
+        adapted = adapted.replace("{{/if}}", "{% endif %}").replace(
+            "{{else}}", "{% else %}"
+        )
+        adapted = re.sub(
+            r"\{\{else if\s+(.+?)\}\}",
+            lambda m: fix_condition(m).replace("{% if", "{% elif"),
+            adapted,
+        )
+
+        def replace_each(match):
+            inner = match.group(1).strip().split()
+            if len(inner) >= 2:
+                return f"{{% for {inner[1]} in {inner[0]} %}}"
+            return f"{{% for item in {inner[0]} %}}"
+
+        adapted = re.sub(r"\{\{\s*each\s+(.+?)\s*\}\}", replace_each, adapted)
+        adapted = adapted.replace("{{/each}}", "{% endfor %}")
+
+        # Raw interpolation {{@ ... }}
+        adapted = re.sub(
+            r"\{\{@\s*(.+?)\s*\}\}",
+            lambda m: (
+                "{{"
+                + m.group(1)
+                .split("||")[0]
+                .replace("&&", " and ")
+                .replace("null", "none")
+                .replace(".length", "|length")
+                + "|safe}}"
+            ),
+            adapted,
+        )
+
+        # Standard interpolation {{ ... }}
+        def replace_interpolation(match):
+            content = (
+                match.group(1)
+                .split("||")[0]
+                .replace("&&", " and ")
+                .replace("null", "none")
+                .replace(".length", "|length")
+            )
+            return "{{" + content + "}}"
+
+        adapted = re.sub(r"\{\{([^%\}]+?)\}\}", replace_interpolation, adapted)
+        return adapted
+
+    def _inline_assets(self, html: str) -> str:
+        """将 CSS 和图片资源内联到 HTML 中"""
+
+        def inline_css(match):
+            path = os.path.join(self.res_path, match.group(1))
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    css_content = f.read()
+                css_content = self._adapt_template(css_content)
+                return f"<style>\n{css_content}\n</style>"
+            return ""
+
+        def inline_image(match):
+            path = os.path.join(self.res_path, match.group(1))
+            if os.path.exists(path):
+                mime = mimetypes.guess_type(path)[0] or "image/png"
+                with open(path, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                    if match.group(0).startswith("src"):
+                        return f'src="data:{mime};base64,{b64}"'
+                    return f"url(data:{mime};base64,{b64})"
+            return match.group(0)
+
+        # Inline <link rel="stylesheet" href="{{_res_path}}...">
+        html = re.sub(
+            r'<link\s+rel="stylesheet"\s+href="\{\{(?:_res_path|pluResPath)\}\}([^"]+\.css)">',
+            inline_css,
+            html,
+        )
+        # Inline src="{{_res_path}}...png"
+        html = re.sub(
+            r'src="\{\{(?:_res_path|pluResPath)\}\}([^"]+\.(?:png|jpg|jpeg|gif|svg|webp))"',
+            inline_image,
+            html,
+        )
+        # Inline url({{_res_path}}...
+        html = re.sub(
+            r"url\(\s*['\"]?\{\{(?:_res_path|pluResPath)\}\}([^)\"']+?)['\"]?\s*\)",
+            inline_image,
+            html,
+        )
+        # Inline style bg url
+        def inline_style_bg(m):
+            path = os.path.join(self.res_path, m.group(1))
+            if os.path.exists(path):
+                mime = mimetypes.guess_type(path)[0] or "image/png"
+                with open(path, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                return f"url(data:{mime};base64,{b64})"
+            return m.group(0)
+
+        html = re.sub(
+            r"url\(\{\{(?:pluResPath|_res_path)\}\}([^)]+)\)",
+            inline_style_bg,
+            html,
+        )
+        return html
+
+    def _render_jinja(
+        self, template_str: str, data: Dict[str, Any]
+    ) -> Optional[str]:
+        """使用 Jinja2 渲染模板"""
+        try:
+            env = self._get_jinja_env()
+            data_copy = data.copy()
+            data_copy["_res_path"] = data_copy.get("pluResPath", "X")
+            return env.from_string(template_str).render(**data_copy)
+        except Exception as e:
+            logger.error(f"[Rocom Render] Jinja2 渲染错误: {e}")
+            return None
+
+    async def _screenshot(
+        self, html: str, name: str, options: Optional[Dict]
+    ) -> Optional[str]:
+        """Playwright 截图"""
+        from playwright.async_api import async_playwright
+
+        output_path = os.path.join(
+            self._output_dir, f"render_{uuid.uuid4().hex[:8]}.png"
+        )
+
+        try:
+            async with self._lock:
+                if not self._playwright:
+                    self._playwright = await async_playwright().start()
+                if not self._browser:
+                    self._browser = await self._playwright.chromium.launch()
+
+            context = await self._browser.new_context(
+                device_scale_factor=2.0,
+                viewport={"width": 1400, "height": 900},
+            )
+            page = await context.new_page()
+
+            temp_html = os.path.join(
+                os.path.dirname(
+                    os.path.abspath(os.path.join(self.res_path, name))
+                ),
+                f"tmp_{uuid.uuid4().hex[:8]}.html",
+            )
+            with open(temp_html, "w", encoding="utf-8") as f:
+                f.write(html)
+
+            try:
+                await page.goto(
+                    f"file:///{temp_html.replace(chr(92), '/')}",
+                    wait_until="networkidle",
+                    timeout=self.render_timeout,
+                )
+            except Exception:
+                pass  # 部分外部资源超时无妨
+
+            # 等待图片加载
+            await page.evaluate(
+                """
+                Promise.all(Array.from(document.images).map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise(resolve => {
+                        img.onload = resolve;
+                        img.onerror = resolve;
+                    });
+                }))
+            """
+            )
+            await page.wait_for_timeout(500)
+
+            el = await page.evaluate_handle("document.body.firstElementChild")
+            box = await el.bounding_box() if el else None
+            if box:
+                await page.set_viewport_size(
+                    {
+                        "width": int(box["width"]) + 2,
+                        "height": int(box["height"]) + 2,
+                    }
+                )
+                await page.screenshot(path=output_path, clip=box, type="png")
+            else:
+                await page.screenshot(path=output_path, full_page=True)
+
+            if el:
+                await el.dispose()
+
+            if os.path.exists(temp_html):
+                os.remove(temp_html)
+            await page.close()
+            await context.close()
+            return output_path
+
+        except Exception as e:
+            logger.error(f"[Rocom Render] Playwright 渲染错误: {e}")
+            return None
+
+    async def close(self):
+        if Renderer._cache_cleanup_task and not Renderer._cache_cleanup_task.done():
+            Renderer._cache_cleanup_task.cancel()
+            Renderer._cache_cleanup_task = None
+        if self._browser:
+            await self._browser.close()
+        if self._playwright:
+            await self._playwright.stop()

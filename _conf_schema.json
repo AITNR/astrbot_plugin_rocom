@@ -1,0 +1,19 @@
+{
+  "api_base_url": {
+    "description": "API 服务后端地址",
+    "type": "string",
+    "default": "https://wegame.shallow.ink",
+    "hint": "除非自建服务端否则保持默认"
+  },
+  "wegame_api_key": {
+    "description": "WeGame API Key",
+    "type": "string",
+    "hint": "拥有 wegame 作用域的 API Key，用于扫码登录",
+    "default": ""
+  },
+  "render_timeout": {
+    "description": "图片渲染超时时间(ms)",
+    "type": "int",
+    "default": 30000
+  }
+}
