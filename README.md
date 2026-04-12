@@ -1,7 +1,7 @@
 <div align="center">
 
-# 本仓库正在构建，请勿下载使用
-### *WeGame 洛克王国数据查询 AstrBot 版*
+# 🏰 astrbot_plugin_rocom
+### *WeGame 洛克王国数据查询*
 
 [![GitHub stars](https://img.shields.io/github/stars/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge&color=FFc65f)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge&color=d88124)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/network)
@@ -17,6 +17,28 @@
 
 ---
 
+## 📝 更新日志
+
+### v1.1.0 (2026-04-12)
+
+**新增功能**
+- 新增洛克交换大厅指令：`/洛克交换大厅` / `/洛克大厅` / `/交换大厅`
+- 新增洛克阵容助手指令：`/洛克阵容 <分类> <页码>`
+- 新增精灵背包分类筛选：`全部`、`异色`、`了不起`、`炫彩`
+
+**优化改进**
+- 修复页脚提示不显示问题
+- 修复页脚过大占据半个屏幕问题
+- 优化渲染器截图逻辑，确保完整包含页脚内容
+- 标准化页脚样式，统一字体大小和间距
+
+**指令优化**
+- 洛克背包：支持参数交换位置，如 `/洛克背包 2 异色` 或 `/洛克背包 异色 2`
+- 默认值：全部第1页，支持 `背包 <页码>` 或 `背包 <分类>` 格式
+- 洛克战绩：修复页脚样式不匹配问题
+
+---
+
 ## 📑 目录
 
 - [✨ 特性一览](#-特性一览)
@@ -24,6 +46,7 @@
 - [📁 项目结构](#-项目结构)
 - [🎮 功能详解](#-功能详解)
 - [🎨 自定义美化](#-自定义美化)
+- [📝 更新日志](#-更新日志)
 - [📋 TODO](#-todo)
 - [❓ 常见问题](#-常见问题)
 - [🙏 鸣谢](#-鸣谢)
@@ -89,7 +112,9 @@ astrbot_plugin_rocom/
     ├── menu/               # 帮助菜单模板
     ├── package/            # 背包图鉴汇总模板
     ├── personal-card/      # 洛克档案面板模板
-    └── record/             # 对战回放数据模板
+    ├── record/             # 对战回放数据模板
+    ├── exchange-hall/      # 洛克交换大厅模板
+    └── lineup/             # 洛克阵容助手模板
 ```
 
 ---
@@ -114,7 +139,9 @@ astrbot_plugin_rocom/
 |:-----|:-----|
 | `洛克档案` | 生成全盘概览的个人数据雷达星级名片 |
 | `洛克战绩 [页码]` | 查询并展示指定历史对战记录的对手及结果 |
-| `洛克背包 [分类] [页码]` | 展示对应条件精选收藏情况，支持 分类如 `了不起` 等 |
+| `洛克背包 [分类] [页码]` | 展示对应条件精选收藏情况，支持分类如 `了不起`、`异色`、`炫彩` 等 |
+| `洛克交换大厅 [页码]` | 浏览其他玩家的精灵交换请求列表 |
+| `洛克阵容 <分类> <页码>` | 查看热门阵容推荐及组成 |
 
 > 💡 发送 `洛克` 可查看插件完整且精美的图片图解版内置帮助。
 
