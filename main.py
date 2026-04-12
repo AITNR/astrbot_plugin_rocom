@@ -16,7 +16,7 @@ from .core.client import RocomClient
 from .core.user import UserManager
 from .core.render import Renderer
 
-@register("astrbot_plugin_rocom", "bvzrays", "洛克王国插件", "v1.0.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.0.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -89,7 +89,7 @@ class RocomPlugin(Star):
                     "menuItems": [
                         {"cmd": "洛克QQ登录", "desc": "使用 QQ 扫码快捷登录及绑定"},
                         {"cmd": "洛克微信登录", "desc": "使用微信扫码快捷登录及绑定"},
-                        {"cmd": "洛克导入 [ID] [Ticket]", "desc": "通过客户端凭证手动登录"},
+                        {"cmd": "洛克导入 <ID> <Ticket>", "desc": "通过客户端凭证手动登录"},
                         {"cmd": "洛克刷新", "desc": "刷新当前主账号 QQ 凭证"}
                     ]
                 },
@@ -97,16 +97,19 @@ class RocomPlugin(Star):
                     "groupTitle": "数据查询",
                     "menuItems": [
                         {"cmd": "洛克档案", "desc": "生成个人数据名片"},
-                        {"cmd": "洛克战绩 [页码]", "desc": "查询并展示近期的对战场次记录"},
-                        {"cmd": "洛克背包 [分类] [页码]", "desc": "展示精灵收集进度，支持异色/了不起/炫彩等"}
+                        {"cmd": "洛克战绩 <页码>", "desc": "查询并展示近期的对战场次记录"},
+                        {"cmd": "洛克背包 <筛选> <页码>", "desc": "查看精灵收集 (筛选:全部/异色/了不起/炫彩，参数可交换)"},
+                        {"cmd": "洛克阵容 <分类> <页码>", "desc": "查看阵容助手推荐阵容 (参数可交换)"},
+                        {"cmd": "洛克交换大厅 <页码>", "desc": "查看交换大厅海报 (支持别名：洛克大厅/交换大厅)"}
                     ]
                 },
                 {
                     "groupTitle": "多账号操作",
                     "menuItems": [
                         {"cmd": "洛克绑定列表", "desc": "查看所有已扫码绑定的账号"},
-                        {"cmd": "洛克切换 [序号]", "desc": "一键切换活跃的数据查询主账号"},
-                        {"cmd": "洛克解绑 [序号]", "desc": "移除不再需要的账号绑定记录"}
+                        {"cmd": "洛克切换 <序号>", "desc": "一键切换活跃的数据查询主账号"},
+                        {"cmd": "洛克登录", "desc": "扫码登录及绑定"},
+                        {"cmd": "洛克解绑 <序号>", "desc": "移除账号绑定记录"}
                     ]
                 }
             ]
@@ -132,6 +135,12 @@ class RocomPlugin(Star):
         }
         await self.user_mgr.add_binding(user_id, binding)
         yield event.plain_result(f"绑定成功！当前账号：{binding['nickname']} (ID: {binding['role_id']})")
+
+    async def _not_logged_in_hint(self, event: AstrMessageEvent):
+        """统一的未登录引导"""
+        yield event.plain_result("💡 [未登录] 你尚未绑定洛克王国账号。请参考下方菜单，发送 /洛克QQ登录 或 /洛克微信登录 进行绑定。")
+        async for res in self.rocom_help(event):
+            yield res
 
     @filter.command("洛克QQ登录")
     async def rocom_qq_login(self, event: AstrMessageEvent):
@@ -164,7 +173,7 @@ class RocomPlugin(Star):
         success = False
         while time.time() - start_time < 115:
             await asyncio.sleep(3)
-            status = await self.client.qq_qr_status(fw_token)
+            status = await self.client.qq_qr_status(fw_token, user_id)
             if not status:
                 continue
                 
@@ -176,10 +185,18 @@ class RocomPlugin(Star):
                 if client and msg_id:
                     try:
                         await client.delete_msg(message_id=msg_id)
-                    except:
+                        logger.info(f"[Rocom] 登录成功，已撤回二维码消息 {msg_id}")
+                    except Exception:
                         pass
                 break
             elif state in ["expired", "failed", "canceled"]:
+                if recall_task and not recall_task.done():
+                    recall_task.cancel()
+                if client and msg_id:
+                    try:
+                        await client.delete_msg(message_id=msg_id)
+                    except:
+                        pass
                 break
                 
         if success:
@@ -213,7 +230,7 @@ class RocomPlugin(Star):
         success = False
         while time.time() - start_time < 115:
             await asyncio.sleep(3)
-            status = await self.client.wechat_qr_status(fw_token)
+            status = await self.client.wechat_qr_status(fw_token, user_id)
             if not status:
                 continue
                 
@@ -225,10 +242,18 @@ class RocomPlugin(Star):
                 if client and msg_id:
                     try:
                         await client.delete_msg(message_id=msg_id)
-                    except:
+                        logger.info(f"[Rocom] 登录成功，已撤回链接消息 {msg_id}")
+                    except Exception:
                         pass
                 break
             elif state in ["expired", "failed"]:
+                if recall_task and not recall_task.done():
+                    recall_task.cancel()
+                if client and msg_id:
+                    try:
+                        await client.delete_msg(message_id=msg_id)
+                    except:
+                        pass
                 break
                 
         if success:
@@ -249,7 +274,7 @@ class RocomPlugin(Star):
         async for r in self._save_binding_with_role_info(event, fw_token, "manual", user_id):
             yield r
 
-    @filter.command("洛克绑定列表")
+    @filter.command("洛克绑定列表", alias={"绑定列表"})
     async def rocom_bind_list(self, event: AstrMessageEvent):
         """查看已绑定账号列表"""
         bindings = await self.user_mgr.get_user_bindings(event.get_sender_id())
@@ -279,7 +304,7 @@ class RocomPlugin(Star):
             "title": "绑定账号列表",
             "subtitle": f"共找到 {len(bindings)} 个有效绑定账号",
             "bindings": bind_items,
-            "tip": "💡 请发送 [洛克切换 (序号)] 来更改当前主账号",
+            "commandHint": "💡 /洛克切换 <序号> 切换主账号 | /洛克解绑 <序号> 移除绑定",
             "copyright": "AstrBot & WeGame Locke Kingdom Plugin"
         }
         
@@ -318,7 +343,8 @@ class RocomPlugin(Star):
         """刷新当前 QQ 扫码凭证"""
         fw_token = await self._get_primary_token(event)
         if not fw_token:
-            yield event.plain_result("暂无绑定账号，请先通过 /洛克QQ登录 或 /洛克微信登录 绑定账号。")
+            async for res in self._not_logged_in_hint(event):
+                yield res
             return
         res = await self.client.refresh_token(fw_token)
         if res and res.get("success"):
@@ -326,12 +352,13 @@ class RocomPlugin(Star):
         else:
             yield event.plain_result("凭证刷新失败，可能已过期或不支持刷新（仅QQ扫码支持）。")
 
-    @filter.command("洛克档案")
+    @filter.command("洛克档案", alias={"档案"})
     async def rocom_profile(self, event: AstrMessageEvent):
         """查看个人档案"""
         fw_token = await self._get_primary_token(event)
         if not fw_token:
-            yield event.plain_result("暂无绑定账号，请先通过 /洛克QQ登录 或 /洛克微信登录 绑定账号。")
+            async for res in self._not_logged_in_hint(event):
+                yield res
             return
 
         yield event.plain_result("正在获取洛克王国数据...")
@@ -343,11 +370,16 @@ class RocomPlugin(Star):
         battle_overview_task = self.client.get_battle_overview(fw_token)
         battle_list_task = self.client.get_battle_list(fw_token, page_size=1)
         
-        results = await asyncio.gather(role_task, eval_task, sum_task, coll_task, battle_overview_task, battle_list_task)
+        results = await asyncio.gather(role_task, eval_task, sum_task, coll_task, battle_overview_task, battle_list_task, return_exceptions=True)
         role_res, eval_res, sum_res, coll_res, bo_res, bl_res = results
         
-        if not role_res or not role_res.get("role"):
-            yield event.plain_result("获取角色档案失败，可能是凭据过期，请尝试重新登录。")
+        if isinstance(role_res, Exception) or not role_res or not role_res.get("role"):
+            err_msg = str(role_res) if isinstance(role_res, Exception) else (role_res.get("message") if isinstance(role_res, dict) else "未知错误")
+            if "401" in err_msg or "403" in err_msg:
+                err_hint = "【凭据过期】请尝试重新通过 QQ/微信 登录绑定。"
+            else:
+                err_hint = f"接口返回错误: {err_msg}"
+            yield event.plain_result(f"获取角色档案失败。\n{err_hint}")
             return
             
         role = role_res["role"]
@@ -360,6 +392,7 @@ class RocomPlugin(Star):
         data = {
             "userName": role.get("name", "洛克"),
             "userAvatarDisplay": role.get("avatar_url", ""),
+            "backgroundUrl": role.get("background_url", ""),
             "userLevel": role.get("level", 1),
             "userUid": role.get("id", ""),
             "enrollDays": role.get("enroll_days", 0),
@@ -369,8 +402,10 @@ class RocomPlugin(Star):
             "bestPetName": sm.get("best_pet_name", ""),
             "summaryTitleParts": sm.get("summary_title", "未 知").split(" "),
             "bestPetImageDisplay": sm.get("best_pet_img_url", ""),
-            "fallbackPetImage": f"{{{{_res_path}}}}img/小洛克.png",
+            "fallbackPetImage": f"{{{{_res_path}}}}img/roco_icon.png",
             "scoreText": ev.get("score", "0.0"),
+            "commandHint": "💡 /洛克背包 <筛选> <页码> | /洛克战绩 <页码> | /洛克 查看菜单",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
             
             "radarPolygons": [
                 "130,30 230,130 130,230 30,130",
@@ -400,7 +435,9 @@ class RocomPlugin(Star):
             "opponentAvatarDisplay": "",
             "matchResult": "",
             "leftTeamPets": [],
-            "rightTeamPets": []
+            "rightTeamPets": [],
+            "commandHint": "💡 /洛克背包 <筛选> <页码> | /洛克战绩 <页码> | /洛克 查看菜单",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin"
         }
         
         # Radar area scaling (mock base max values)
@@ -457,11 +494,12 @@ class RocomPlugin(Star):
             yield event.plain_result("档案图像生成失败。")
 
     @filter.command("洛克战绩")
-    async def rocom_record(self, event: AstrMessageEvent, page: str = "1"):
-        """查看最近个人对战记录"""
+    async def rocom_battle_record(self, event: AstrMessageEvent, page: str = "1"):
+        """查看对战战绩"""
         fw_token = await self._get_primary_token(event)
         if not fw_token:
-            yield event.plain_result("暂无绑定账号，请先通过 /洛克QQ登录 或 /洛克微信登录 绑定账号。")
+            async for res in self._not_logged_in_hint(event):
+                yield res
             return
             
         try:
@@ -471,9 +509,18 @@ class RocomPlugin(Star):
         
         # 简易实现分页，因为没有 after_time 无法随机跳转，只能支持当前只拉一页或者固定N条
         # 此处按原文档只作为战绩展示，我们就展示最近一页
-        role_res = await self.client.get_role(fw_token)
-        bo_res = await self.client.get_battle_overview(fw_token)
-        bl_res = await self.client.get_battle_list(fw_token, page_size=4)
+        results = await asyncio.gather(
+            self.client.get_role(fw_token),
+            self.client.get_battle_overview(fw_token),
+            self.client.get_battle_list(fw_token, page_size=4),
+            return_exceptions=True
+        )
+        role_res, bo_res, bl_res = results
+        
+        if isinstance(role_res, Exception) or not role_res or "role" not in role_res:
+             err_msg = str(role_res) if isinstance(role_res, Exception) else (role_res.get("message") if isinstance(role_res, dict) else "未知错误")
+             yield event.plain_result(f"获取战绩数据失败：{err_msg}")
+             return
         
         role = role_res.get("role", {}) if role_res else {}
         bo = bo_res or {}
@@ -516,7 +563,9 @@ class RocomPlugin(Star):
             "totalMatch": bo.get("total_match", 0),
             "currentPage": page_no,
             "totalPages": 1,
-            "battles": parsed_battles
+            "battles": parsed_battles,
+            "commandHint": "💡 /洛克战绩 <页码> | 默认第1页",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin"
         }
 
         img_url = await self.renderer.render_html("render/record/index.html", data)
@@ -525,39 +574,52 @@ class RocomPlugin(Star):
         else:
             yield event.plain_result("战绩图生成失败。")
 
-    @filter.command("洛克背包")
-    async def rocom_package(self, event: AstrMessageEvent, category: str = "全部", page: str = "1"):
+    @filter.command("洛克背包", alias={"背包"})
+    async def rocom_package(self, event: AstrMessageEvent, arg1: str = None, arg2: str = None):
         """查看个人洛克王国精灵背包"""
         fw_token = await self._get_primary_token(event)
         if not fw_token:
-            yield event.plain_result("暂无绑定账号，请先通过 /洛克QQ登录 或 /洛克微信登录 绑定账号。")
+            async for res in self._not_logged_in_hint(event):
+                yield res
             return
             
-        try:
-            page_no = int(page)
-        except:
-            page_no = 1
-            
+        # 智能解析参数
+        category = "全部"
+        page_no = 1
+        
         cat_map = {
-            "全部": 0, "全部精灵": 0,
-            "了不起": 1, "了不起的精灵": 1,
-            "异色": 2, "异色精灵": 2,
-            "炫彩": 3, "炫彩精灵": 3
+            "全部": 0, "了不起": 1, "异色": 2, "炫彩": 3,
+            "全部精灵": 0, "了不起精灵": 1, "异色精灵": 2, "炫彩精灵": 3
         }
-        pet_subset = cat_map.get(category, 0)
-        cat_name = {0: "全部精灵", 1: "了不起的精灵", 2: "异色精灵", 3: "炫彩精灵"}[pet_subset]
+
+        # 参数乱序识别
+        for arg in [arg1, arg2]:
+            if not arg or not isinstance(arg, str): continue
+            if arg.isdigit():
+                page_no = int(arg)
+            elif arg in cat_map:
+                category = arg.replace("精灵", "")
+        
+        pet_subset = cat_map.get(category, cat_map.get(category+"精灵", 0))
+        cat_name = f"{category}精灵"
+        
+        # 统一生成指令提示 (支持参数乱序)
+        hint_str = "💡 /洛克背包 <全部/异色/了不起/炫彩> <页码> | 参数可交换位置，默认：全部第1页"
         
         role_res = await self.client.get_role(fw_token)
         pet_res = await self.client.get_pets(fw_token, pet_subset=pet_subset, page_no=page_no, page_size=10)
         
-        role = role_res.get("role", {}) if role_res else {}
-        pets_data = pet_res or {}
+        if not role_res or "role" not in role_res or not pet_res or "pets" not in pet_res:
+            err_msg = role_res.get("message") if isinstance(role_res, dict) and role_res.get("message") else (pet_res.get("message") if isinstance(pet_res, dict) else "接口异常")
+            yield event.plain_result(f"获取背包数据失败：{err_msg}")
+            return
         
-        total_count = pets_data.get("total", 0)
+        role = role_res.get("role", {})
+        total_count = pet_res.get("total", 0)
         total_pages = max(1, (total_count + 9) // 10)
         
         pets_list = []
-        for pet in pets_data.get("pets", []):
+        for pet in pet_res.get("pets", []):
             element_icons = []
             for t in pet.get("pet_types_info", []):
                 if t.get("name"):
@@ -604,8 +666,9 @@ class RocomPlugin(Star):
             "currentPage": page_no,
             "totalPages": total_pages,
             "pageSize": 10,
-            "commandHint": "用洛克背包 <分类> <页数> 进行翻页",
-            "fallbackPetImage": f"{{{{_res_path}}}}img/小洛克.png",
+            "commandHint": hint_str,
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+            "fallbackPetImage": f"{{{{_res_path}}}}img/roco_icon.png",
             "pets": pets_list,
             "emptySlots": list(range(empty_count))
         }
@@ -615,3 +678,131 @@ class RocomPlugin(Star):
             yield event.image_result(img_url)
         else:
             yield event.plain_result("背包图生成失败。")
+    @filter.command("洛克图鉴", alias={"图鉴"})
+    async def rocom_wiki(self, event: AstrMessageEvent, name: str = "焰火"):
+        """查询精灵图鉴"""
+        data = {
+            "name": name,
+            "number": "???",
+            "pet_types": [],
+            "main_image": f"{{{{_res_path}}}}img/roco_icon.png",
+            "variants": {
+                "elf": f"{{{{_res_path}}}}img/roco_icon.png",
+                "shiny": f"{{{{_res_path}}}}img/roco_icon.png",
+                "fruit": f"{{{{_res_path}}}}img/roco_icon.png",
+                "egg": f"{{{{_res_path}}}}img/roco_icon.png"
+            },
+            "total_stats": 0,
+            "pet_stats": [],
+            "description": "此处为精灵介绍预览。",
+            "pet_traits": [],
+            "pet_evolution": [],
+            "sprite_skills": [],
+            "commandHint": "💡 /洛克图鉴 <宠物名> 查询其他精灵",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin"
+        }
+        
+        img_url = await self.renderer.render_html("render/pet-wiki/index.html", data)
+        if img_url:
+            yield event.image_result(img_url)
+        else:
+            yield event.plain_result("图鉴生成失败。")
+    @filter.command("洛克交换大厅", alias={"洛克大厅", "交换大厅"})
+    async def rocom_exchange_hall(self, event: AstrMessageEvent, page: str = "1"):
+        """查看交换大厅"""
+        logger.info(f"收到交换大厅请求: page={page}")
+        fw_token = await self._get_primary_token(event)
+        if not fw_token:
+            async for res in self._not_logged_in_hint(event):
+                yield res
+            return
+            
+        try:
+            page_no = int(page)
+        except:
+            page_no = 1
+            
+        try:
+            res = await self.client.get_exchange_posters(fw_token, page_no=page_no)
+            if not res or "posters" not in res:
+                err_msg = res.get("message") if isinstance(res, dict) else "数据结构异常"
+                yield event.plain_result(f"获取交换大厅数据失败：{err_msg}")
+                return
+        except Exception as e:
+            yield event.plain_result(f"获取交换大厅数据发生异常：{str(e)}")
+            return
+            
+        posts = []
+        for p in res.get("posters", []):
+            u = p.get("user_info", {})
+            posts.append({
+                "userName": u.get("nickname", "未知"),
+                "userLevel": u.get("level", 0),
+                "isOnline": u.get("online_status") == 1,
+                "avatarUrl": u.get("avatar_url", ""),
+                "userId": u.get("role_id", "未知"),
+                "wantText": p.get("want_item_name", "交友"),
+                "provideItems": p.get("offer_items", []),
+                "timeLabel": datetime.fromtimestamp(int(p.get("create_time", 0))).strftime("%m-%d %H:%M") if p.get("create_time") else "未知"
+            })
+            
+        
+        data = {
+            "filterLabel": "全部",
+            "posts": posts,
+            "currentPage": page_no,
+            "totalPages": res.get("total_pages", 1),
+            "commandHint": "💡 /洛克交换大厅 <页码> | 默认第1页，支持别名：/洛克大厅 / /交换大厅",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin"
+        }
+        
+        img_url = await self.renderer.render_html("render/exchange-hall/index.html", data)
+        if img_url:
+            yield event.image_result(img_url)
+        else:
+            yield event.plain_result("交换大厅渲染失败。")
+
+    @filter.command("洛克阵容", alias={"阵容"})
+    async def rocom_lineup(self, event: AstrMessageEvent, arg1: str = None, arg2: str = None):
+        """查看阵容推荐"""
+        fw_token = await self._get_primary_token(event)
+        if not fw_token:
+            async for res in self._not_logged_in_hint(event):
+                yield res
+            return
+            
+        category = ""
+        page_no = 1
+        
+        # 参数乱序识别
+        for arg in [arg1, arg2]:
+            if not arg: continue
+            if arg.isdigit():
+                page_no = int(arg)
+            else:
+                category = arg
+            
+        hint_str = "💡 /洛克阵容 <分类> <页码> | 参数可交换位置，默认：热门推荐第1页"
+        if category:
+            hint_str = f"💡 当前分类：{category} | /洛克阵容 {category} 2 查看下一页"
+            
+        res = await self.client.get_lineup_list(fw_token, page_no=page_no, category=category)
+        if not res or "lineups" not in res:
+            yield event.plain_result("获取阵容数据失败。")
+            return
+            
+        data = {
+            "category": category or "热门推荐",
+            "lineups": res.get("lineups", []),
+            "page_no": res.get("page_no", 1),
+            "total_pages": res.get("total_pages", 1),
+            "commandHint": hint_str,
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+            "fallbackPetImage": f"{{{{_res_path}}}}img/roco_icon.png"
+        }
+        
+        img_url = await self.renderer.render_html("render/lineup/index.html", data)
+        if img_url:
+            yield event.image_result(img_url)
+        else:
+            yield event.plain_result("阵容图生成失败。")

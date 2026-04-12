@@ -8,7 +8,7 @@
   "wegame_api_key": {
     "description": "WeGame API Key",
     "type": "string",
-    "hint": "拥有 wegame 作用域的 API Key，用于扫码登录",
+    "hint": "WeGame API Key，用于扫码登录及游戏数据查询",
     "default": ""
   },
   "render_timeout": {
