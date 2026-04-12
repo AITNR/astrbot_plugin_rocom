@@ -2,6 +2,7 @@
 
 # 🏰 astrbot_plugin_rocom
 ### *WeGame 洛克王国数据查询*
+![IMG_20260412_232041](https://github.com/user-attachments/assets/446759b3-c9d8-4752-800c-acf47d55e70f)
 
 [![GitHub stars](https://img.shields.io/github/stars/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge&color=FFc65f)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge&color=d88124)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/network)
@@ -141,15 +142,20 @@ astrbot_plugin_rocom/
 
 | `洛克档案` | `洛克战绩` |
 |:---:|:---:|
-| 个人数据雷达星级名片 | 近期对战记录详情 |
+| <img width="1886" height="1072" alt="image" src="https://github.com/user-attachments/assets/fd92e4f2-8ed1-4522-ae7e-25ad3f64024d" />
+ | <img width="1920" height="512" alt="image" src="https://github.com/user-attachments/assets/df897cf8-c16c-4d7a-8d3a-b6b578e6d7a5" />
+ |
 
 | `洛克背包` | `洛克交换大厅` |
 |:---:|:---:|
-| 精灵背包图鉴检索 | 玩家交换请求列表 |
+| <img width="2440" height="1500" alt="image" src="https://github.com/user-attachments/assets/34488d6e-ec8d-4ed5-9cb0-1cb0893fbf12" />
+ | <img width="1920" height="1304" alt="image" src="https://github.com/user-attachments/assets/5d64df8f-a37d-4a71-ac3d-c3e9847dd5b7" />
+ |
 
 | `洛克阵容` | `查看阵容` |
 |:---:|:---:|
-| 2x3 网格布局展示 | 阵容详细信息 |
+| <img width="2440" height="1854" alt="image" src="https://github.com/user-attachments/assets/3fb6f800-cae6-4a1b-9b14-1cc2715e0973" />
+ | 阵容详细信息 |
 
 </details>
 
