@@ -1,10 +1,10 @@
 """
 WeGame + Rocom HTTP API 客户端
 
-认证分两层：
-- 登录 / 账号管理接口使用 wegame_api_key (scope=wegame)
-- 游戏数据查询接口使用 rocom_api_key (scope=game:rocom)
-- 所有游戏查询接口额外携带 X-Framework-Token
+基于单一 API Key 模型：
+- 每个开发者仅维护 1 个 WeGame API Key
+- 该 Key 统一用于 WeGame 登录层与具体游戏接口 (如 game:rocom)
+- session 管理接口依据 X-API-Key + X-User-Identifier 进行身份校验
 """
 
 import httpx
@@ -31,18 +31,34 @@ class RocomClient:
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
 
-    def _wegame_headers(self, fw_token: str = "") -> Dict[str, str]:
-        """登录/账号管理接口的请求头"""
+    def _wegame_headers(
+        self, fw_token: str = "", user_identifier: str = ""
+    ) -> Dict[str, str]:
+        """登录/账号管理接口的请求头 (scope=wegame)"""
         headers = {}
         if self.wegame_api_key:
             headers["X-API-Key"] = self.wegame_api_key
+        
         if fw_token:
             headers["X-Framework-Token"] = fw_token
+        if user_identifier:
+            headers["X-User-Identifier"] = self._sanitize_uid(user_identifier)
         return headers
 
+    def _sanitize_uid(self, uid: str) -> str:
+        """参考 Go 端的 SanitizeStrictInput 逻辑"""
+        import re
+        if not uid: return ""
+        uid = str(uid).strip()
+        # 注意：服务器端 Go 逻辑允许字母、数字以及中日韩字符。
+        cleaned = re.sub(r'[^a-zA-Z0-9_\- \u4e00-\u9fa5]', '', uid)
+        return cleaned.strip()
+
     def _rocom_headers(self, fw_token: str) -> Dict[str, str]:
-        """游戏数据查询接口的请求头"""
-        headers = {"X-Framework-Token": fw_token}
+        """游戏数据查询接口的请求头 (scope=game:rocom)"""
+        headers = {
+            "X-Framework-Token": fw_token
+        }
         if self.wegame_api_key:
             headers["X-API-Key"] = self.wegame_api_key
         return headers
@@ -105,60 +121,95 @@ class RocomClient:
 
     # ─── 登录相关 ───
 
-    async def qq_qr_login(self, user_identifier: str = "") -> Optional[Dict]:
+    async def qq_qr_login(
+        self, user_identifier: str = ""
+    ) -> Optional[Dict]:
         """发起 QQ 扫码登录，返回 frameworkToken + qr_image (base64)"""
         params = {"client_type": "bot", "client_id": "astrbot"}
         if user_identifier:
-            params["user_identifier"] = user_identifier
+            params["user_identifier"] = self._sanitize_uid(user_identifier)
         return await self._get(
             "/api/v1/login/wegame/qr",
-            self._wegame_headers(),
+            self._wegame_headers(user_identifier=user_identifier),
             params=params,
         )
 
-    async def qq_qr_status(self, fw_token: str) -> Optional[Dict]:
+    async def qq_qr_status(
+        self, fw_token: str, user_identifier: str = ""
+    ) -> Optional[Dict]:
         """轮询 QQ 扫码状态"""
+        params = {}
+        if user_identifier:
+            params["user_identifier"] = self._sanitize_uid(user_identifier)
         return await self._get(
             "/api/v1/login/wegame/status",
-            self._wegame_headers(fw_token),
+            self._wegame_headers(
+                fw_token, user_identifier=user_identifier
+            ),
+            params=params,
         )
 
-    async def wechat_qr_login(self, user_identifier: str = "") -> Optional[Dict]:
+    async def wechat_qr_login(
+        self, user_identifier: str = ""
+    ) -> Optional[Dict]:
         """发起微信扫码登录，返回 frameworkToken + qr_image (URL)"""
         params = {"client_type": "bot", "client_id": "astrbot"}
         if user_identifier:
-            params["user_identifier"] = user_identifier
+            params["user_identifier"] = self._sanitize_uid(user_identifier)
         return await self._get(
             "/api/v1/login/wegame/wechat/qr",
-            self._wegame_headers(),
+            self._wegame_headers(user_identifier=user_identifier),
             params=params,
         )
 
-    async def wechat_qr_status(self, fw_token: str) -> Optional[Dict]:
+    async def wechat_qr_status(
+        self, fw_token: str, user_identifier: str = ""
+    ) -> Optional[Dict]:
         """轮询微信扫码状态"""
+        params = {}
+        if user_identifier:
+            params["user_identifier"] = self._sanitize_uid(user_identifier)
         return await self._get(
             "/api/v1/login/wegame/wechat/status",
-            self._wegame_headers(fw_token),
+            self._wegame_headers(
+                fw_token, user_identifier=user_identifier
+            ),
+            params=params,
         )
 
-    async def get_qq_token(self, fw_token: str) -> Optional[Dict]:
+    async def get_qq_token(
+        self, fw_token: str, user_identifier: str = ""
+    ) -> Optional[Dict]:
         """查询 QQ 扫码凭证"""
+        user_identifier = self._sanitize_uid(user_identifier)
+        params = {}
+        if user_identifier:
+            params["user_identifier"] = user_identifier
         return await self._get(
             "/api/v1/login/wegame/token",
-            self._wegame_headers(fw_token),
+            self._wegame_headers(fw_token, user_identifier),
+            params=params,
         )
 
-    async def get_wechat_token(self, fw_token: str) -> Optional[Dict]:
+    async def get_wechat_token(
+        self, fw_token: str, user_identifier: str = ""
+    ) -> Optional[Dict]:
         """查询微信扫码凭证"""
+        user_identifier = self._sanitize_uid(user_identifier)
+        params = {}
+        if user_identifier:
+            params["user_identifier"] = user_identifier
         return await self._get(
             "/api/v1/login/wegame/wechat/token",
-            self._wegame_headers(fw_token),
+            self._wegame_headers(fw_token, user_identifier),
+            params=params,
         )
 
     async def import_token(
         self, tgp_id: str, tgp_ticket: str, user_identifier: str = ""
     ) -> Optional[Dict]:
         """导入 tgp_id + tgp_ticket 凭证"""
+        user_identifier = self._sanitize_uid(user_identifier)
         body: Dict[str, Any] = {
             "tgp_id": tgp_id,
             "tgp_ticket": tgp_ticket,
@@ -169,113 +220,104 @@ class RocomClient:
             body["user_identifier"] = user_identifier
         return await self._post(
             "/api/v1/login/wegame/token",
-            self._wegame_headers(),
+            self._wegame_headers(user_identifier=user_identifier),
             json_data=body,
         )
-
-    async def refresh_token(self, fw_token: str) -> Optional[Dict]:
-        """刷新 QQ 凭证（仅 QQ 扫码登录的凭证支持）"""
-        return await self._get(
-            "/api/v1/login/wegame/refresh",
-            self._wegame_headers(fw_token),
-        )
-
-    async def delete_token(self, fw_token: str) -> Optional[Dict]:
-        """删除凭证"""
-        return await self._delete(
-            "/api/v1/login/wegame/token",
-            self._wegame_headers(fw_token),
-        )
-
-    # ─── 账号绑定管理 ───
-
-    async def get_bindings(self, user_identifier: str) -> Optional[Dict]:
-        """获取用户绑定列表"""
-        headers = self._wegame_headers()
-        headers["X-User-Identifier"] = user_identifier
-        return await self._get("/api/v1/user/bindings", headers)
 
     async def create_binding(
         self, fw_token: str, user_identifier: str
     ) -> Optional[Dict]:
-        """手动创建绑定"""
-        headers = self._wegame_headers()
+        """将匿名创建的 frameworkToken 通过 API Key 绑定给用户，从而获得持久授权"""
+        user_identifier = self._sanitize_uid(user_identifier)
+        payload = {
+            "framework_token": fw_token,
+            "user_identifier": user_identifier,
+            "client_type": "bot",
+            "client_id": "astrbot",
+        }
         return await self._post(
             "/api/v1/user/bindings",
-            headers,
-            json_data={
-                "framework_token": fw_token,
-                "user_identifier": user_identifier,
-                "client_type": "bot",
-                "client_id": "astrbot",
-            },
-        )
-
-    async def switch_primary(
-        self, binding_id: str, user_identifier: str
-    ) -> Optional[Dict]:
-        """切换主账号"""
-        headers = self._wegame_headers()
-        headers["X-User-Identifier"] = user_identifier
-        return await self._post(
-            f"/api/v1/user/bindings/{binding_id}/primary", headers
-        )
-
-    async def refresh_binding(
-        self, binding_id: str, user_identifier: str
-    ) -> Optional[Dict]:
-        """刷新绑定凭证"""
-        headers = self._wegame_headers()
-        headers["X-User-Identifier"] = user_identifier
-        return await self._post(
-            f"/api/v1/user/bindings/{binding_id}/refresh", headers
+            # 这里必须带 API Key
+            self._wegame_headers(user_identifier=user_identifier),
+            json_data=payload,
         )
 
     async def delete_binding(
         self, binding_id: str, user_identifier: str
-    ) -> Optional[Dict]:
-        """删除绑定"""
-        headers = self._wegame_headers()
-        headers["X-User-Identifier"] = user_identifier
-        return await self._delete(
-            f"/api/v1/user/bindings/{binding_id}", headers
+    ) -> bool:
+        """删除绑定记录"""
+        headers = self._wegame_headers(user_identifier=user_identifier)
+        res = await self._delete(
+            f"/api/v1/user/bindings/{binding_id}",
+            headers
         )
+        return res is not None
 
     # ─── 洛克王国游戏数据 ───
 
-    async def get_role(self, fw_token: str) -> Optional[Dict]:
+    async def get_role(
+        self, fw_token: str, account_type: int = None
+    ) -> Optional[Dict]:
         """角色资料"""
+        params = {}
+        if account_type:
+            params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/profile/role",
             self._rocom_headers(fw_token),
+            params=params,
         )
 
-    async def get_evaluation(self, fw_token: str) -> Optional[Dict]:
+    async def get_evaluation(
+        self, fw_token: str, account_type: int = None
+    ) -> Optional[Dict]:
         """AI 维度评价"""
+        params = {}
+        if account_type:
+            params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/profile/evaluation",
             self._rocom_headers(fw_token),
+            params=params,
         )
 
-    async def get_pet_summary(self, fw_token: str) -> Optional[Dict]:
+    async def get_pet_summary(
+        self, fw_token: str, account_type: int = None
+    ) -> Optional[Dict]:
         """精灵摘要"""
+        params = {}
+        if account_type:
+            params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/profile/pet-summary",
             self._rocom_headers(fw_token),
+            params=params,
         )
 
-    async def get_collection(self, fw_token: str) -> Optional[Dict]:
+    async def get_collection(
+        self, fw_token: str, account_type: int = None
+    ) -> Optional[Dict]:
         """收藏数据"""
+        params = {}
+        if account_type:
+            params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/profile/collection",
             self._rocom_headers(fw_token),
+            params=params,
         )
 
-    async def get_battle_overview(self, fw_token: str) -> Optional[Dict]:
+    async def get_battle_overview(
+        self, fw_token: str, account_type: int = None
+    ) -> Optional[Dict]:
         """对战总览"""
+        params = {}
+        if account_type:
+            params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/profile/battle-overview",
             self._rocom_headers(fw_token),
+            params=params,
         )
 
     async def get_battle_list(
@@ -283,11 +325,14 @@ class RocomClient:
         fw_token: str,
         page_size: int = 4,
         after_time: str = "",
+        zone: int = None,
     ) -> Optional[Dict]:
         """对战记录列表"""
         params: Dict[str, Any] = {"page_size": page_size}
         if after_time:
             params["after_time"] = after_time
+        if zone is not None:
+            params["zone"] = zone
         return await self._get(
             "/api/v1/games/rocom/battle/list",
             self._rocom_headers(fw_token),
@@ -300,6 +345,7 @@ class RocomClient:
         pet_subset: int = 0,
         page_no: int = 1,
         page_size: int = 10,
+        zone: int = None,
     ) -> Optional[Dict]:
         """精灵列表"""
         params = {
@@ -307,13 +353,51 @@ class RocomClient:
             "page_no": page_no,
             "page_size": page_size,
         }
+        if zone is not None:
+            params["zone"] = zone
         return await self._get(
             "/api/v1/games/rocom/battle/pets",
             self._rocom_headers(fw_token),
-            params=params,
+            params,
+        )
+
+    async def get_lineup_list(
+        self,
+        fw_token: str,
+        page_no: int = 1,
+        category: str = "",
+        account_type: int = None,
+    ) -> Optional[Dict]:
+        """查询阵容助手列表"""
+        params = {"page_no": page_no}
+        if category:
+            params["category"] = category
+        if account_type:
+            params["account_type"] = account_type
+        return await self._get(
+            "/api/v1/games/rocom/lineup/list",
+            self._rocom_headers(fw_token),
+            params,
+        )
+
+    async def get_exchange_posters(
+        self,
+        fw_token: str,
+        page_no: int = 1,
+        refresh: bool = False,
+        account_type: int = None,
+    ) -> Optional[Dict]:
+        """查询交换大厅海报列表"""
+        params = {"page_no": page_no, "refresh": "true" if refresh else "false"}
+        if account_type:
+            params["account_type"] = account_type
+        return await self._get(
+            "/api/v1/games/rocom/exchange/posters",
+            self._rocom_headers(fw_token),
+            params,
         )
 
     async def close(self):
-        if self._client and not self._client.is_closed:
+        if self._client:
             await self._client.aclose()
             self._client = None

@@ -170,8 +170,18 @@ class Renderer:
         def inline_css(match):
             path = os.path.join(self.res_path, match.group(1))
             if os.path.exists(path):
-                with open(path, "r", encoding="utf-8") as f:
-                    css_content = f.read()
+                css_content = ""
+                try:
+                    with open(path, "r", encoding="utf-8", errors="replace") as f:
+                        css_content = f.read()
+                except UnicodeDecodeError:
+                    try:
+                        with open(path, "r", encoding="gbk", errors="replace") as f:
+                            css_content = f.read()
+                    except Exception as e:
+                        logger.error(f"[Renderer] 无法读取 CSS 文件 {path}: {e}")
+                        return ""
+                
                 css_content = self._adapt_template(css_content)
                 return f"<style>\n{css_content}\n</style>"
             return ""
@@ -290,13 +300,13 @@ class Renderer:
             )
             await page.wait_for_timeout(500)
 
-            el = await page.evaluate_handle("document.body.firstElementChild")
+            el = await page.evaluate_handle("document.body")
             box = await el.bounding_box() if el else None
             if box:
                 await page.set_viewport_size(
                     {
-                        "width": int(box["width"]) + 2,
-                        "height": int(box["height"]) + 2,
+                        "width": int(box["width"]),
+                        "height": int(box["height"]),
                     }
                 )
                 await page.screenshot(path=output_path, clip=box, type="png")
