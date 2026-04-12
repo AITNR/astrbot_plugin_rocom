@@ -17,10 +17,9 @@ from astrbot.api import logger
 
 
 class Renderer:
-    """洛克王国 HTML→图片渲染器"""
+    """洛克王国 HTML→图片 渲染器"""
 
     _jinja_env: Optional[jinja2.Environment] = None
-    _cache_cleanup_task: Optional[asyncio.Task] = None
 
     @classmethod
     def _get_jinja_env(cls) -> jinja2.Environment:
@@ -37,13 +36,18 @@ class Renderer:
         self._browser = None
         self._playwright = None
         self._lock = asyncio.Lock()
+        self._cache_cleanup_task: Optional[asyncio.Task] = None
         self._output_dir = os.path.abspath(
             os.path.join(self.res_path, "render_cache")
         )
         os.makedirs(self._output_dir, exist_ok=True)
 
-        if Renderer._cache_cleanup_task is None or Renderer._cache_cleanup_task.done():
-            Renderer._cache_cleanup_task = asyncio.create_task(
+        self._start_cache_cleanup_task()
+
+    def _start_cache_cleanup_task(self):
+        """启动后台清理任务"""
+        if self._cache_cleanup_task is None or self._cache_cleanup_task.done():
+            self._cache_cleanup_task = asyncio.create_task(
                 self._cache_cleanup_loop()
             )
 
@@ -300,7 +304,25 @@ class Renderer:
             )
             await page.wait_for_timeout(500)
 
-            el = await page.evaluate_handle("document.body")
+            # 优先查找第一个非 body 的块级元素，避免截取到多余的空白
+            el = await page.evaluate_handle("""
+                () => {
+                    // 尝试查找常见的内容容器
+                    const selectors = [
+                        '.exchange-page',
+                        '.record-page', 
+                        '.package-cont',
+                        '.page-section-main',
+                        '.lineup-page'
+                    ];
+                    for (const selector of selectors) {
+                        const element = document.querySelector(selector);
+                        if (element) return element;
+                    }
+                    // 如果都没找到，使用 body 的第一个子元素
+                    return document.body.firstElementChild || document.body;
+                }
+            """)
             box = await el.bounding_box() if el else None
             if box:
                 await page.set_viewport_size(
@@ -327,9 +349,9 @@ class Renderer:
             return None
 
     async def close(self):
-        if Renderer._cache_cleanup_task and not Renderer._cache_cleanup_task.done():
-            Renderer._cache_cleanup_task.cancel()
-            Renderer._cache_cleanup_task = None
+        if self._cache_cleanup_task and not self._cache_cleanup_task.done():
+            self._cache_cleanup_task.cancel()
+            self._cache_cleanup_task = None
         if self._browser:
             await self._browser.close()
         if self._playwright:

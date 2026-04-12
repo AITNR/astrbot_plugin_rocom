@@ -256,7 +256,7 @@ class RocomClient:
     # ─── 洛克王国游戏数据 ───
 
     async def get_role(
-        self, fw_token: str, account_type: int = None
+        self, fw_token: str, account_type: int | None = None
     ) -> Optional[Dict]:
         """角色资料"""
         params = {}
@@ -269,7 +269,7 @@ class RocomClient:
         )
 
     async def get_evaluation(
-        self, fw_token: str, account_type: int = None
+        self, fw_token: str, account_type: int | None = None
     ) -> Optional[Dict]:
         """AI 维度评价"""
         params = {}
@@ -282,7 +282,7 @@ class RocomClient:
         )
 
     async def get_pet_summary(
-        self, fw_token: str, account_type: int = None
+        self, fw_token: str, account_type: int | None = None
     ) -> Optional[Dict]:
         """精灵摘要"""
         params = {}
@@ -295,7 +295,7 @@ class RocomClient:
         )
 
     async def get_collection(
-        self, fw_token: str, account_type: int = None
+        self, fw_token: str, account_type: int | None = None
     ) -> Optional[Dict]:
         """收藏数据"""
         params = {}
@@ -308,7 +308,7 @@ class RocomClient:
         )
 
     async def get_battle_overview(
-        self, fw_token: str, account_type: int = None
+        self, fw_token: str, account_type: int | None = None
     ) -> Optional[Dict]:
         """对战总览"""
         params = {}
@@ -325,7 +325,7 @@ class RocomClient:
         fw_token: str,
         page_size: int = 4,
         after_time: str = "",
-        zone: int = None,
+        zone: int | None = None,
     ) -> Optional[Dict]:
         """对战记录列表"""
         params: Dict[str, Any] = {"page_size": page_size}
@@ -345,7 +345,7 @@ class RocomClient:
         pet_subset: int = 0,
         page_no: int = 1,
         page_size: int = 10,
-        zone: int = None,
+        zone: int | None = None,
     ) -> Optional[Dict]:
         """精灵列表"""
         params = {
@@ -366,7 +366,7 @@ class RocomClient:
         fw_token: str,
         page_no: int = 1,
         category: str = "",
-        account_type: int = None,
+        account_type: int | None = None,
     ) -> Optional[Dict]:
         """查询阵容助手列表"""
         params = {"page_no": page_no}
@@ -385,7 +385,7 @@ class RocomClient:
         fw_token: str,
         page_no: int = 1,
         refresh: bool = False,
-        account_type: int = None,
+        account_type: int | None = None,
     ) -> Optional[Dict]:
         """查询交换大厅海报列表"""
         params = {"page_no": page_no, "refresh": "true" if refresh else "false"}

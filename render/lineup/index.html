@@ -2,72 +2,75 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="{{_res_path}}render/record/style.css"> <!-- 复用战绩样式 -->
-  <style>
-    body { background: transparent; margin: 0; padding: 0; display: inline-block; }
-    .lineup-page { width: 1000px; padding: 25px; background: #1e1a16; border: 1px solid #443c34; border-radius: 12px; font-family: dundun, system-ui; color: #eeddbb; }
-    .lineup-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffc966; padding-bottom: 15px; margin-bottom: 25px; }
-    .lineup-title { font-size: 32px; font-weight: bold; color: #ffc966; letter-spacing: 2px; }
-    .lineup-subtitle { font-size: 18px; color: #eeddbb; opacity: 0.8; }
-    .lineup-list { display: flex; flex-direction: column; gap: 20px; }
-    .lineup-item { background: rgba(255, 201, 102, 0.05); border: 1px solid #443c34; border-radius: 8px; padding: 20px; }
-    .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid rgba(238, 221, 187, 0.2); padding-bottom: 10px; }
-    .item-name { font-size: 22px; color: #ffc966; font-weight: bold; }
-    .item-author { font-size: 16px; color: #eeddbb; opacity: 0.6; }
-    .pet-grid { display: flex; flex-wrap: wrap; gap: 15px; }
-    .pet-card { width: 140px; background: rgba(0, 0, 0, 0.2); border: 1px solid #443c34; border-radius: 6px; padding: 10px; text-align: center; }
-    .pet-icon { width: 80px; height: 80px; margin: 0 auto 10px; position: relative; }
-    .pet-icon img { width: 100%; height: 100%; border-radius: 50%; border: 2px solid #ffc966; }
-    .bloodline-badge { position: absolute; bottom: -5px; right: -5px; width: 28px; height: 28px; background: #1e1a16; border-radius: 50%; border: 1px solid #ffc966; padding: 2px; }
-    .pet-name { font-size: 16px; color: #ffc966; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .skill-list { display: flex; justify-content: center; gap: 5px; }
-    .skill-icon { width: 24px; height: 24px; border: 1px solid rgba(238, 221, 187, 0.3); border-radius: 3px; }
-    .pagination { margin-top: 30px; display: flex; justify-content: space-between; align-items: center; font-size: 16px; color: #eeddbb; border-top: 1px solid #443c34; padding-top: 15px; }
-    .hint { font-size: 14px; opacity: 0.5; }
-  </style>
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <link rel="stylesheet" href="{{_res_path}}render/lineup/style.css">
 </head>
-<body class="page-out-client">
+<body>
   <div class="lineup-page">
+    <!-- Header -->
     <div class="lineup-header">
-      <div class="lineup-title">阵容助手</div>
-      <div class="lineup-subtitle">{{if category}}{{category}}{{else}}热门推荐{{/if}}</div>
+      <div class="header-title">阵容助手</div>
+      <div class="header-subtitle">{{if category}}{{category}}{{else}}热门推荐{{/if}}</div>
     </div>
 
-    <div class="lineup-list">
-      {{each lineups lineup}}
-      <div class="lineup-item">
-        <div class="item-header">
-          <div class="item-name">{{lineup.name}}</div>
-          <div class="item-author">作者: {{lineup.author_name}}</div>
+    <!-- Lineup Grid -->
+    <div class="lineup-grid">
+      {{each lineups lineup index}}
+      <div class="lineup-card">
+        <!-- Card Header -->
+        <div class="card-header">
+          <div class="lineup-name">
+            <span class="lineup-icon">🔥</span>
+            {{lineup.name}}
+          </div>
+          <div class="lineup-tags">
+            {{each lineup.tags tag}}
+            <span class="tag">{{tag}}</span>
+            {{/each}}
+          </div>
         </div>
-        <div class="pet-grid">
-          {{each lineup.lineup.pets pet}}
+
+        <!-- Pet List -->
+        <div class="pet-list">
+          {{each lineup.pets pet}}
           <div class="pet-card">
-            <div class="pet-icon">
+            <div class="pet-avatar">
               <img src="{{pet.pet_img_url}}" onerror="this.src='{{fallbackPetImage}}'">
-              {{if pet.bloodline_info}}
-              <div class="bloodline-badge" title="{{pet.bloodline_info.name}}">
-                <img src="{{pet.bloodline_info.icon}}" style="width:100%;height:100%;border:none;">
-              </div>
-              {{/if}}
             </div>
-            <div class="pet-name">{{pet.pet_name}}</div>
-            <div class="skill-list">
-              {{each pet.skills_info skill}}
-              <img class="skill-icon" src="{{skill.skill_img_url}}" title="{{skill.skill_name}}" onerror="this.style.display='none'">
-              {{/each}}
+            <div class="pet-info">
+              <div class="pet-name">{{pet.pet_name}}</div>
+              <div class="skill-list">
+                {{each pet.skills_info skill}}
+                <img class="skill-icon" src="{{skill.skill_img_url}}" title="{{skill.skill_name}}" onerror="this.style.display='none'">
+                {{/each}}
+              </div>
             </div>
           </div>
           {{/each}}
+        </div>
+
+        <!-- Card Footer -->
+        <div class="card-footer">
+          <div class="author-info">
+            <img class="author-avatar" src="{{lineup.author_avatar}}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%23333\'%3E%3Ccircle cx=\'12\' cy=\'12\' r=\'12\'/%3E%3C/svg%3E'">
+            <div class="author-details">
+              <span class="author-name">{{lineup.author_name}}</span>
+              <span class="author-likes">👍 {{lineup.likes}}</span>
+            </div>
+          </div>
+          <div class="lineup-code-box">
+            <span class="lineup-code-label">阵容码:</span>
+            <span class="lineup-code">{{lineup.lineup_code}}</span>
+          </div>
         </div>
       </div>
       {{/each}}
     </div>
 
-    <div class="pagination">
-      <div class="pages">第 {{page_no}} 页 / 共 {{total_pages}} 页</div>
-      <div class="hint">{{commandHint}}</div>
+    <!-- Footer -->
+    <div class="pagination-footer">
+      <span class="pagination-text">第 {{page_no}} 页 / 共 {{total_pages}} 页</span>
+      <span class="pagination-hint">{{commandHint}}</span>
     </div>
   </div>
 </body>
