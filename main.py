@@ -195,7 +195,7 @@ class RocomPlugin(Star):
                 if client and msg_id:
                     try:
                         await client.delete_msg(message_id=msg_id)
-                    except:
+                    except Exception:
                         pass
                 break
                 
@@ -252,7 +252,7 @@ class RocomPlugin(Star):
                 if client and msg_id:
                     try:
                         await client.delete_msg(message_id=msg_id)
-                    except:
+                    except Exception:
                         pass
                 break
                 
@@ -383,10 +383,10 @@ class RocomPlugin(Star):
             return
             
         role = role_res["role"]
-        ev = eval_res or {}
-        sm = sum_res or {}
-        cl = coll_res or {}
-        bo = bo_res or {}
+        ev = eval_res if isinstance(eval_res, dict) else {}
+        sm = sum_res if isinstance(sum_res, dict) else {}
+        cl = coll_res if isinstance(coll_res, dict) else {}
+        bo = bo_res if isinstance(bo_res, dict) else {}
         
         # 组装数据
         data = {
@@ -504,7 +504,7 @@ class RocomPlugin(Star):
             
         try:
             page_no = int(page)
-        except:
+        except ValueError:
             page_no = 1
         
         # 简易实现分页，因为没有 after_time 无法随机跳转，只能支持当前只拉一页或者固定N条
@@ -523,7 +523,7 @@ class RocomPlugin(Star):
              return
         
         role = role_res.get("role", {}) if role_res else {}
-        bo = bo_res or {}
+        bo = bo_res if isinstance(bo_res, dict) else {}
         
         parsed_battles = []
         if bl_res and bl_res.get("battles"):
@@ -533,7 +533,7 @@ class RocomPlugin(Star):
                     bt = datetime.fromisoformat(bt_str)
                     t_str = bt.strftime("%H:%M")
                     d_str = bt.strftime("%Y-%m-%d")
-                except:
+                except (ValueError, TypeError):
                     t_str = "未知"
                     d_str = "未知"
                     
@@ -762,6 +762,81 @@ class RocomPlugin(Star):
         else:
             yield event.plain_result("交换大厅渲染失败。")
 
+    @filter.command("查看阵容", alias={"阵容详情"})
+    async def rocom_lineup_detail(self, event: AstrMessageEvent, lineup_id: str = None):
+        """查看阵容详情"""
+        if not lineup_id:
+            yield event.plain_result("请提供阵容码。用法：/查看阵容 <阵容码>")
+            return
+            
+        fw_token = await self._get_primary_token(event)
+        if not fw_token:
+            async for res in self._not_logged_in_hint(event):
+                yield res
+            return
+        
+        # 先获取阵容列表，找到对应 ID 的阵容
+        res = await self.client.get_lineup_list(fw_token, page_no=1)
+        if not res or "lineups" not in res:
+            yield event.plain_result("获取阵容数据失败。")
+            return
+        
+        # 查找匹配的阵容
+        target_lineup = None
+        for lineup in res.get("lineups", []):
+            if str(lineup.get("id", "")) == lineup_id:
+                target_lineup = lineup
+                break
+        
+        # 如果当前页没有，尝试获取更多页
+        if not target_lineup:
+            total_pages = res.get("total_pages", 1)
+            for page in range(2, min(total_pages + 1, 10)):  # 最多查找前 10 页
+                res = await self.client.get_lineup_list(fw_token, page_no=page)
+                if res and "lineups" in res:
+                    for lineup in res.get("lineups", []):
+                        if str(lineup.get("id", "")) == lineup_id:
+                            target_lineup = lineup
+                            break
+                if target_lineup:
+                    break
+        
+        if not target_lineup:
+            yield event.plain_result(f"未找到阵容码为 {lineup_id} 的阵容。")
+            return
+        
+        # 处理阵容数据
+        lineup_data = target_lineup.get("lineup", {})
+        processed_pets = []
+        for pet in lineup_data.get("pets", []):
+            pet_data = {
+                "pet_name": pet.get("pet_name", ""),
+                "pet_img_url": pet.get("pet_img_url", ""),
+                "skills": [skill.get("skill_img_url", "") for skill in pet.get("skills_info", [])],
+                "bloodline": pet.get("bloodline_info") is not None,
+                "bloodline_icon": pet.get("bloodline_info", {}).get("icon", "") if pet.get("bloodline_info") else ""
+            }
+            processed_pets.append(pet_data)
+        
+        data = {
+            "lineup": {
+                "name": target_lineup.get("name", ""),
+                "tags": target_lineup.get("tags", []),
+                "pets": processed_pets,
+                "author_name": target_lineup.get("author_name", ""),
+                "author_avatar": target_lineup.get("author_avatar", ""),
+                "likes": target_lineup.get("likes", 0),
+                "lineup_code": lineup_id
+            },
+            "fallbackPetImage": f"{{{{_res_path}}}}img/roco_icon.png"
+        }
+        
+        img_url = await self.renderer.render_html("render/lineup-detail/index.html", data)
+        if img_url:
+            yield event.image_result(img_url)
+        else:
+            yield event.plain_result("阵容详情渲染失败。")
+
     @filter.command("洛克阵容", alias={"阵容"})
     async def rocom_lineup(self, event: AstrMessageEvent, arg1: str = None, arg2: str = None):
         """查看阵容推荐"""
@@ -777,7 +852,7 @@ class RocomPlugin(Star):
         # 参数乱序识别
         for arg in [arg1, arg2]:
             if not arg: continue
-            if arg.isdigit():
+            if isinstance(arg, int) or (isinstance(arg, str) and arg.isdigit()):
                 page_no = int(arg)
             else:
                 category = arg
@@ -791,9 +866,34 @@ class RocomPlugin(Star):
             yield event.plain_result("获取阵容数据失败。")
             return
             
+        # 处理阵容数据
+        processed_lineups = []
+        for lineup in res.get("lineups", []):
+            processed_lineup = {
+                "name": lineup.get("name", ""),
+                "tags": lineup.get("tags", []),
+                "pets": [],
+                "author_name": lineup.get("author_name", ""),
+                "author_avatar": lineup.get("author_avatar", ""),
+                "likes": lineup.get("likes", 0),
+                "lineup_code": str(lineup.get("id", ""))
+            }
+            
+            # 处理每个精灵的数据
+            lineup_data = lineup.get("lineup", {})
+            for pet in lineup_data.get("pets", []):
+                pet_data = {
+                    "pet_name": pet.get("pet_name", ""),
+                    "pet_img_url": pet.get("pet_img_url", ""),
+                    "skills": [skill.get("skill_img_url", "") for skill in pet.get("skills_info", [])]
+                }
+                processed_lineup["pets"].append(pet_data)
+            
+            processed_lineups.append(processed_lineup)
+            
         data = {
             "category": category or "热门推荐",
-            "lineups": res.get("lineups", []),
+            "lineups": processed_lineups,
             "page_no": res.get("page_no", 1),
             "total_pages": res.get("total_pages", 1),
             "commandHint": hint_str,
