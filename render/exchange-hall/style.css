@@ -241,3 +241,27 @@ html, body {
 .user-avatar .helper-image{flex-shrink:0;width:1.16rem;height:1.16rem}
 .ai-card-img .helper-image{width:2rem;height:2rem}
 .record-recent .match-item .player-avatar .helper-image{width:.285rem;height:.285rem}
+
+/* ====== Footer ====== */
+.pagination-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.2rem;
+    padding-top: 0.15rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 0.05rem;
+}
+
+.pagination-text {
+    font-family: var(--helper-font-family-mianfeiziti);
+    color: #f4eee1;
+    font-size: 0.18rem;
+}
+
+.pagination-hint {
+    font-family: var(--helper-font-family-mianfeiziti);
+    color: #a8a69f;
+    font-size: 0.14rem;
+}

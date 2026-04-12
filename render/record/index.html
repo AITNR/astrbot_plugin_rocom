@@ -4,19 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=1280, initial-scale=1">
   <link rel="stylesheet" href="{{_res_path}}render/record/style.css">
-  <style>
-    html, body {
-      overflow: visible !important;
-      width: auto !important;
-      height: auto !important;
-    }
-    body {
-      background: transparent;
-      margin: 0;
-      padding: 0;
-      display: inline-block;
-    }
-  </style>
 </head>
 <body>
   <div class="record-page">
@@ -89,8 +76,8 @@
 
     <!-- Footer -->
     <div class="record-footer">
-      <span class="footer-hint">第 {{currentPage}} 页 / 共 {{totalPages}} 页</span>
-      <span class="footer-cmd">用 "洛克战绩 <页数>" 进行翻页</span>
+      <span class="footer-hint">{{commandHint}}</span>
+      <span class="footer-cmd">{{copyright}}</span>
     </div>
   </div>
 </body>

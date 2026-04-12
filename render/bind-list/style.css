@@ -153,27 +153,26 @@ body {
     font-size: 16px;
 }
 
-/* 底部提示区域改为纯文字 */
-.bind-tip {
-    margin-top: 15px;
-    padding: 10px 0;
+/* 标准化页脚区域 */
+.pagination-footer {
+    margin-top: 20px;
+    padding-top: 15px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
+    border-top: 1.5px dashed rgba(160, 140, 110, 0.4);
+}
+
+.pagination-hint {
     color: #9e8e76;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: bold;
 }
 
-.tip-icon {
-    font-size: 18px;
-}
-
-.footer {
-    margin-top: 20px;
-    text-align: center;
-    font-size: 12px;
+.copyright {
     color: #bfae95;
+    font-size: 11px;
     opacity: 0.8;
 }

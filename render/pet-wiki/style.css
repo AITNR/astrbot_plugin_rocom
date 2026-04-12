@@ -1,0 +1,429 @@
+@font-face {
+    font-family: 'fzlant';
+    src: url('../../ttf/fzlant.ttf');
+}
+
+@font-face {
+    font-family: 'dundun';
+    src: url('../../ttf/dundun.ttf');
+}
+
+:root {
+    --brand-yellow: #ffba00;
+    --brand-blue: #0084ff;
+    --text-primary: #333;
+    --text-secondary: #666;
+    --bg-glass: rgba(255, 255, 255, 0.85);
+    --border-color: rgba(0, 0, 0, 0.08);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body.wiki-body {
+    background-image: url('https://wiki.biligame.com/rocom/special/hp.php?f=bg.png'); /* 站位，实际渲染会用背景 */
+    background-color: #f0f2f5;
+    font-family: 'fzlant', sans-serif;
+    color: var(--text-primary);
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.wiki-container {
+    width: 1200px;
+    background: var(--bg-glass);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    padding: 30px;
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+/* Header */
+.wiki-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    border-bottom: 2px solid var(--brand-yellow);
+    padding-bottom: 15px;
+}
+
+.pet-number {
+    font-family: 'dundun';
+    font-size: 28px;
+    color: var(--text-secondary);
+}
+
+.pet-name {
+    font-family: 'dundun';
+    font-size: 36px;
+    color: var(--text-primary);
+}
+
+.pet-types {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.type-tag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0,0,0,0.05);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+}
+
+.type-tag img {
+    width: 18px;
+    height: 18px;
+}
+
+/* Main Row */
+.wiki-main-row {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 30px;
+}
+
+.wiki-illustration-side {
+    flex: 0 0 400px;
+}
+
+.main-illustration {
+    width: 400px;
+    height: 400px;
+    background: rgba(255,255,255,0.5);
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.main-illustration img {
+    max-width: 90%;
+    max-height: 90%;
+    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.15));
+}
+
+.variant-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.variant-item {
+    background: white;
+    padding: 10px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--border-color);
+}
+
+.variant-item img {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+}
+
+.variant-item span {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Info Side */
+.wiki-info-side {
+    flex: 1;
+}
+
+.info-table {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.stats-row {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.stats-total {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.stats-total .label { font-size: 14px; color: var(--text-secondary); }
+.stats-total .value { font-size: 24px; font-weight: bold; color: var(--brand-blue); }
+
+.stats-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.stat-bar-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.stat-label {
+    width: 40px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.stat-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.stat-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+}
+
+.stat-value {
+    width: 30px;
+    text-align: right;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.description-row {
+    padding: 15px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.description-row .info-label {
+    font-size: 14px;
+    color: var(--brand-yellow);
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.description-row .info-content {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+/* Trait Section (The requested vertical label style) */
+.trait-section {
+    display: flex;
+    background: #2d2d2d;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 30px;
+    color: white;
+}
+
+.trait-vertical-label {
+    width: 40px;
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    font-family: 'dundun';
+    font-size: 18px;
+    color: var(--brand-yellow);
+    letter-spacing: 5px;
+    text-transform: uppercase;
+}
+
+.trait-content-list {
+    flex: 1;
+    padding: 15px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.trait-item {
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 10px;
+}
+
+.trait-item:last-child { border: none; }
+
+.trait-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.trait-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--brand-yellow);
+}
+
+.trait-tag {
+    font-size: 11px;
+    background: var(--brand-blue);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.trait-effect {
+    font-size: 13px;
+    color: #ccc;
+    line-height: 1.4;
+}
+
+/* Evolution */
+.evolution-section {
+    margin-bottom: 30px;
+}
+
+.section-title {
+    font-family: 'dundun';
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: var(--text-primary);
+    border-left: 4px solid var(--brand-yellow);
+    padding-left: 10px;
+}
+
+.evolution-track {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid var(--border-color);
+}
+
+.evo-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    opacity: 0.6;
+}
+
+.evo-stage.current { opacity: 1; transform: scale(1.1); }
+
+.evo-img img { width: 80px; height: 80px; }
+.evo-name { font-size: 13px; font-weight: bold; }
+.evo-arrow { color: #ccc; font-size: 20px; }
+
+/* Skills Grid (2-column layout) */
+.skills-block {
+    margin-bottom: 30px;
+}
+
+.skills-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.skill-card-wiki {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    transition: transform 0.2s;
+}
+
+.skill-card-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+}
+
+.skill-lv {
+    font-size: 11px;
+    color: white;
+    background: var(--text-secondary);
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.skill-meta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.skill-name { font-size: 14px; font-weight: bold; color: var(--text-primary); }
+.skill-power { font-size: 11px; color: var(--text-secondary); }
+
+.skill-type-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 6px;
+    color: white;
+    min-width: 45px;
+}
+
+.skill-type-text { font-size: 11px; font-weight: bold; }
+.skill-energy { font-size: 10px; opacity: 0.9; }
+
+.skill-card-body {
+    padding: 10px 12px;
+}
+
+.skill-card-body p {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* Specific skill styles */
+.skill-card-wiki.bloodline .skill-lv { background: #ff5e5e; }
+.skill-card-wiki.stone .skill-lv { background: #be5eff; }
+
+/* Standardized Pagination Footer */
+.pagination-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 20px;
+    padding: 15px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 8px;
+    width: 100%;
+}
+.pagination-text {
+    font-size: 16px;
+    color: #f4eee1;
+}
+.pagination-hint {
+    color: #ffc966;
+    font-size: 16px;
+    font-weight: bold;
+}
+.copyright {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 12px;
+}
