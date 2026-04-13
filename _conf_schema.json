@@ -8,7 +8,7 @@
   "wegame_api_key": {
     "description": "WeGame API Key",
     "type": "string",
-    "hint": "WeGame API Key，用于扫码登录及游戏数据查询",
+    "hint": "熵增开放平台 API Key，用于扫码登录及游戏数据查询，地址:前端未完工",
     "default": ""
   },
   "render_timeout": {
