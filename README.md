@@ -4,7 +4,7 @@
 
 ### *WeGame 洛克王国数据查询*
 
-![IMG\_20260412\_232041](https://github.com/user-attachments/assets/446759b3-c9d8-4752-800c-acf47d55e70f)
+<img src="https://github.com/user-attachments/assets/446759b3-c9d8-4752-800c-acf47d55e70f" width="400" alt="LOGO">
 
 [![GitHub stars](https://img.shields.io/github/stars/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=FFc65f)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=d88124)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/network)
