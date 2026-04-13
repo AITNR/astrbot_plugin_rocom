@@ -16,7 +16,7 @@ from .core.client import RocomClient
 from .core.user import UserManager
 from .core.render import Renderer
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.2.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.3.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -170,13 +170,14 @@ class RocomPlugin(Star):
             tmp_path = tmp.name
             
         client, msg_id = await self._send_and_get_msg_id(event, [
-            {"type": "text", "data": {"text": "请使用 QQ 扫描二维码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！"}},
+            {"type": "at", "data": {"qq": str(event.get_sender_id())}},
+            {"type": "text", "data": {"text": "\n请使用 QQ 扫描二维码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！"}},
             {"type": "image", "data": {"file": "base64://" + qr_b64.split(",")[-1]}}
         ])
 
         if msg_id is None:
             yield event.chain_result([
-                Plain("请使用 QQ 扫描二维码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！"),
+                Plain(f"@{event.get_sender_id()}\n请使用 QQ 扫描二维码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！"),
                 Image.fromFileSystem(tmp_path)
             ])
             
@@ -231,11 +232,12 @@ class RocomPlugin(Star):
         qr_url = qr_data["qr_image"]
         
         client, msg_id = await self._send_and_get_msg_id(event, [
-            {"type": "text", "data": {"text": f"请使用微信打开以下链接扫码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！\n{qr_url}"}}
+            {"type": "at", "data": {"qq": str(event.get_sender_id())}},
+            {"type": "text", "data": {"text": f"\n请使用微信打开以下链接扫码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！\n{qr_url}"}}
         ])
 
         if msg_id is None:
-            yield event.plain_result(f"请使用微信打开以下链接扫码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！\n{qr_url}")
+            yield event.plain_result(f"@{event.get_sender_id()}\n请使用微信打开以下链接扫码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！\n{qr_url}")
             
         recall_task = self._schedule_recall(client, msg_id, 110) if client and msg_id else None
         
@@ -683,10 +685,12 @@ class RocomPlugin(Star):
 
         # 参数乱序识别
         for arg in [arg1, arg2]:
-            if not arg or not isinstance(arg, str): continue
-            if arg.isdigit():
+            if not arg: continue
+            # 处理数字（页码）
+            if isinstance(arg, int) or (isinstance(arg, str) and arg.isdigit()):
                 page_no = int(arg)
-            elif arg in cat_map:
+            # 处理分类
+            elif isinstance(arg, str) and arg in cat_map:
                 category = arg.replace("精灵", "")
         
         pet_subset = cat_map.get(category, cat_map.get(category+"精灵", 0))
