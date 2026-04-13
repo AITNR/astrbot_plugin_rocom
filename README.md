@@ -1,22 +1,25 @@
 <div align="center">
 
-# 🏰 astrbot_plugin_rocom
-### *WeGame 洛克王国数据查询*
-![IMG_20260412_232041](https://github.com/user-attachments/assets/446759b3-c9d8-4752-800c-acf47d55e70f)
+# 🏰 astrbot\_plugin\_rocom
 
-[![GitHub stars](https://img.shields.io/github/stars/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge&color=FFc65f)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge&color=d88124)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/network)
-[![GitHub issues](https://img.shields.io/github/issues/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge&color=45B7D1)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/issues)
-[![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-FFc65f?style=for-the-badge&logo=python)](https://github.com/Soulter/AstrBot)
+### *WeGame 洛克王国数据查询*
+
+![IMG\_20260412\_232041](https://github.com/user-attachments/assets/446759b3-c9d8-4752-800c-acf47d55e70f)
+
+[![GitHub stars](https://img.shields.io/github/stars/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=FFc65f)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=d88124)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/network)
+[![GitHub issues](https://img.shields.io/github/issues/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=45B7D1)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/issues)
+[![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-FFc65f?style=for-the-badge\&logo=python)](https://github.com/Soulter/AstrBot)
 
 ### 🚀 基于 WeGame API & 洛克王国数据 的查询工具
+
 ### 扫码绑定 · 个人档案 · 最近战绩 · 精灵背包 · 阵容助手
 
 **如果这个插件对你有帮助，请点亮⭐支持一下！**
 
 </div>
 
----
+***
 
 ## 📑 目录
 
@@ -31,11 +34,11 @@
 - [❓ 常见问题](#-常见问题)
 - [🙏 鸣谢](#-鸣谢)
 
----
+***
 
 ## ✨ 特性一览
 
-✅ **账号管理** - 扫码登录 (QQ/微信)/凭证导入/多账号切换/删除绑定，主账号快速切换  
+✅ **账号管理** - 扫码登录 (QQ/微信)/凭证导入/多账号切换/删除绑定，主账号快速切换
 
 ✅ **消息撤回** - 登录链接与二维码超时、完成或被拒时自动撤回，保护账号安全
 
@@ -45,7 +48,7 @@
 
 ✅ **阵容助手** - 热门阵容推荐、2x3 网格布局展示、阵容码查询、详细技能配置
 
----
+***
 
 ## 🔧 安装与配置
 
@@ -68,13 +71,13 @@ playwright install chromium
 
 ### 配置项说明
 
-| 配置项 | 类型 | 默认值 | 说明 |
-|:-------|:-----|:-------|:-----|
-| `api_base_url` | string | `https://wegame.shallow.ink` | API 服务后端地址 |
-| `wegame_api_key` | string | 无 | ⚠️ 必填，拥有 wegame 作用域的 API Key，统一用于各项查询获取 |
-| `render_timeout` | number | `30000` | 图片渲染超时时间（毫秒） |
+| 配置项              | 类型     | 默认值                          | 说明                                      |
+| :--------------- | :----- | :--------------------------- | :-------------------------------------- |
+| `api_base_url`   | string | `https://wegame.shallow.ink` | API 服务后端地址                              |
+| `wegame_api_key` | string | 无                            | ⚠️ 必填，拥有 wegame 作用域的 API Key，统一用于各项查询获取 |
+| `render_timeout` | number | `30000`                      | 图片渲染超时时间（毫秒）                            |
 
----
+***
 
 ## 📁 项目结构
 
@@ -102,7 +105,7 @@ astrbot_plugin_rocom/
     └── lineup-detail/      # 阵容详情模板
 ```
 
----
+***
 
 ## 🎮 功能详解
 
@@ -110,30 +113,30 @@ astrbot_plugin_rocom/
 
 ### 🔐 账号与绑定
 
-| 指令 | 说明 |
-|:-----|:-----|
-| `洛克QQ登录` | 使用 QQ 扫码快捷登录及绑定 |
-| `洛克微信登录` | 使用微信扫码快捷登录及绑定 |
-| `洛克导入 [ID] [Ticket]` | 通过客户端扫尾凭证手动导入登录 |
-| `洛克刷新` | 刷新当前有效主账号 QQ 凭证生存期 |
-| `洛克绑定列表` | 查看所有已扫描绑定的账号记录 |
-| `洛克切换 [序号]` | 一键切换当前群聊激活的前置主查询账号 |
-| `洛克解绑 [序号]` | 移除不再需要的冗余账号绑定内容 |
+| 指令                   | 说明                 |
+| :------------------- | :----------------- |
+| `洛克QQ登录`             | 使用 QQ 扫码快捷登录及绑定    |
+| `洛克微信登录`             | 使用微信扫码快捷登录及绑定      |
+| `洛克导入 [ID] [Ticket]` | 通过客户端扫尾凭证手动导入登录    |
+| `洛克刷新`               | 刷新当前有效主账号 QQ 凭证生存期 |
+| `洛克绑定列表`             | 查看所有已扫描绑定的账号记录     |
+| `洛克切换 [序号]`          | 一键切换当前群聊激活的前置主查询账号 |
+| `洛克解绑 [序号]`          | 移除不再需要的冗余账号绑定内容    |
 
 ### 📊 数据查询
 
-| 指令 | 说明 |
-|:-----|:-----|
-| `洛克档案` | 生成全盘概览的个人数据雷达星级名片 |
-| `洛克战绩 [页码]` | 查询并展示指定历史对战记录的对手及结果 |
+| 指令               | 说明                                   |
+| :--------------- | :----------------------------------- |
+| `洛克档案`           | 生成全盘概览的个人数据雷达星级名片                    |
+| `洛克战绩 [页码]`      | 查询并展示指定历史对战记录的对手及结果                  |
 | `洛克背包 [分类] [页码]` | 展示对应条件精选收藏情况，支持分类如 `了不起`、`异色`、`炫彩` 等 |
-| `洛克交换大厅 [页码]` | 浏览其他玩家的精灵交换请求列表 |
-| `洛克阵容 <分类> <页码>` | 查看热门阵容推荐及组成，2x3 网格布局展示 |
-| `查看阵容 <阵容码>` | 查看指定阵容的详细信息，包含精灵技能配置 |
+| `洛克交换大厅 [页码]`    | 浏览其他玩家的精灵交换请求列表                      |
+| `洛克阵容 <分类> <页码>` | 查看热门阵容推荐及组成，2x3 网格布局展示               |
+| `查看阵容 <阵容码>`     | 查看指定阵容的详细信息，包含精灵技能配置                 |
 
 > 💡 发送 `洛克` 可查看插件完整且精美的图片图解版内置帮助。
 
----
+***
 
 ## 📸 功能预览
 
@@ -154,7 +157,7 @@ astrbot_plugin_rocom/
 
 </details>
 
----
+***
 
 ## 🎨 自定义美化
 
@@ -162,12 +165,12 @@ astrbot_plugin_rocom/
 
 **路径：** `AstrBot/data/plugins/astrbot_plugin_rocom/img/`
 
-| 功能 | 文件 |
-|:-----|:-----|
-| 背景图 | `bg.C8CUoi7I.jpg` |
+| 功能   | 文件                       |
+| :--- | :----------------------- |
+| 背景图  | `bg.C8CUoi7I.jpg`        |
 | 战绩背景 | `record-bg.C1mPRb4R.png` |
 
----
+***
 
 ## 📋 TODO
 
@@ -176,22 +179,43 @@ astrbot_plugin_rocom/
 - [x] **阵容助手** (阵容列表/详情查询)
 - [ ] **更多功能** (敬请期待)
 
----
+***
 
 ## 📜 更新日志
 
 <details>
 <summary>点击展开版本历史</summary>
 
+### v1.2.0 (2026-04-12)
+
+**新增功能**
+
+- 新增 `/洛克删除无效绑定` 指令：自动清理失效的绑定记录（需要 bot 管理员权限）
+- 新增双设备扫码提醒：QQ/微信扫码时提示需要在手机端已登录洛克王国后进行扫码
+
+**优化改进**
+
+- 更新登录流程：扫码成功后自动调用 `POST /api/v1/user/bindings` 绑定账号
+- 修复 `/洛克刷新` 错误：使用正确的 `refresh_binding` API 刷新凭证
+- 修复 `/洛克阵容` 错误提示：当 token 过期时显示友好的重新登录提示
+- 优化错误处理：导入凭证失败时显示具体错误信息
+- 添加日志记录：删除绑定失败时记录详细错误信息
+
+**权限管理**
+
+- 删除无效绑定指令：支持群管理员和配置的 allowed_users 双重权限检查
+
 ### v1.1.0 (2026-04-12)
 
 **新增功能**
+
 - 新增洛克交换大厅指令：`/洛克交换大厅` / `/洛克大厅` / `/交换大厅`
 - 新增洛克阵容助手指令：`/洛克阵容 <分类> <页码>`
 - 新增查看阵容详情指令：`/查看阵容 <阵容码>`
 - 新增精灵背包分类筛选：`全部`、`异色`、`了不起`、`炫彩`
 
 **优化改进**
+
 - 重构阵容列表页面样式：采用 2x3 网格布局、方形精灵头像、卡片式设计
 - 优化阵容详情页面渲染效果，精灵头像采用圆形展示
 - 修复页脚提示不显示问题
@@ -200,6 +224,7 @@ astrbot_plugin_rocom/
 - 标准化页脚样式，统一字体大小和间距
 
 **指令优化**
+
 - 洛克背包：支持参数交换位置，如 `/洛克背包 2 异色` 或 `/洛克背包 异色 2`
 - 默认值：全部第 1 页，支持 `背包 <页码>` 或 `背包 <分类>` 格式
 - 洛克战绩：修复页脚样式不匹配问题
@@ -213,34 +238,35 @@ astrbot_plugin_rocom/
 
 </details>
 
----
+***
 
 ## 🙏 鸣谢
-
 
 - **Astrbot**：[Soulter/AstrBot](https://github.com/Soulter/AstrBot) 提供强大的机器人开发与部署平台支撑
 
 特别感谢：
+
 - **熵增项目组** - 对各类抓取代理转发能力的构筑
 
 本插件界面 UI 由原平台页面自研拆解逆向还原成微网页模板。全部图表美术素材著作及归属权属于腾讯科技 WeGame 及《洛克王国》项目组官方主体。
 
----
+***
 
 <div align="center">
 
 ### 💬 加入交流群
 
-| AstrBot 洛克王国插件交流群 |
-|:---:|
-| [870543663](https://qm.qq.com/q/kPxQZy5gg8) |
+| 群聊                 | 群号                                           |
+| :----------------- | :------------------------------------------- |
+| astrbot洛克王国插件BUG反馈 | [870543663](https://qm.qq.com/q/kPxQZy5gg8)  |
+| 熵增项目组洛克王国插件交流      | [1097809141](https://qm.qq.com/q/8SuHC3siIM) |
 
 </div>
 
----
+***
 
 <div align="center">
-    
+
 # 如果喜欢这个插件，别忘了给仓库点个⭐！
 
 # [⬆ 返回顶部](#-astrbot_plugin_rocom)

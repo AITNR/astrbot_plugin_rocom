@@ -16,7 +16,7 @@ from .core.client import RocomClient
 from .core.user import UserManager
 from .core.render import Renderer
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.1.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.2.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -90,7 +90,8 @@ class RocomPlugin(Star):
                         {"cmd": "洛克QQ登录", "desc": "使用 QQ 扫码快捷登录及绑定"},
                         {"cmd": "洛克微信登录", "desc": "使用微信扫码快捷登录及绑定"},
                         {"cmd": "洛克导入 <ID> <Ticket>", "desc": "通过客户端凭证手动登录"},
-                        {"cmd": "洛克刷新", "desc": "刷新当前主账号 QQ 凭证"}
+                        {"cmd": "洛克刷新", "desc": "刷新当前主账号 QQ 凭证"},
+                        {"cmd": "洛克删除无效绑定", "desc": "清理失效的绑定记录 (管理员)"}
                     ]
                 },
                 {
@@ -121,13 +122,22 @@ class RocomPlugin(Star):
             yield event.plain_result("菜单生成失败。")
 
     async def _save_binding_with_role_info(self, event: AstrMessageEvent, fw_token: str, login_type: str, user_id: str):
-        yield event.plain_result("登录成功，正在获取角色信息...")
+        yield event.plain_result("登录成功，正在调用绑定接口...")
+        bind_res = await self.client.create_binding(fw_token, user_id)
+        if not bind_res or not bind_res.get("binding"):
+            yield event.plain_result("绑定接口调用失败，请稍后重试。")
+            return
+        
+        yield event.plain_result("绑定成功，正在获取角色信息...")
         role_res = await self.client.get_role(fw_token)
         role = role_res.get("role", {}) if role_res else {}
         
+        binding_data = bind_res.get("binding", {})
+        binding_id = binding_data.get("id", fw_token)
+        
         binding = {
             "framework_token": fw_token,
-            "binding_id": fw_token,
+            "binding_id": binding_id,
             "login_type": login_type,
             "role_id": role.get("id", "未知"),
             "nickname": role.get("name", "洛克"),
@@ -160,12 +170,15 @@ class RocomPlugin(Star):
             tmp_path = tmp.name
             
         client, msg_id = await self._send_and_get_msg_id(event, [
-            {"type": "image", "data": {"file": "base64://" + qr_b64.split(",")[-1]}},
-            {"type": "text", "data": {"text": "请使用 QQ 扫描二维码登录 (有效时间 2 分钟)"}}
+            {"type": "text", "data": {"text": "请使用 QQ 扫描二维码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！"}},
+            {"type": "image", "data": {"file": "base64://" + qr_b64.split(",")[-1]}}
         ])
-        
+
         if msg_id is None:
-            yield event.chain_result([Image.fromFileSystem(tmp_path), Plain("请使用 QQ 扫描二维码登录 (有效时间 2 分钟)")])
+            yield event.chain_result([
+                Plain("请使用 QQ 扫描二维码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！"),
+                Image.fromFileSystem(tmp_path)
+            ])
             
         recall_task = self._schedule_recall(client, msg_id, 110) if client and msg_id else None
         
@@ -218,11 +231,11 @@ class RocomPlugin(Star):
         qr_url = qr_data["qr_image"]
         
         client, msg_id = await self._send_and_get_msg_id(event, [
-            {"type": "text", "data": {"text": f"请使用微信打开以下链接扫码登录 (有效时间 2 分钟):\n{qr_url}"}}
+            {"type": "text", "data": {"text": f"请使用微信打开以下链接扫码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！\n{qr_url}"}}
         ])
-        
+
         if msg_id is None:
-            yield event.plain_result(f"请使用微信打开以下链接扫码登录 (有效时间 2 分钟):\n{qr_url}")
+            yield event.plain_result(f"请使用微信打开以下链接扫码登录 (有效时间 2 分钟)\n⚠️ 注意需要双设备扫码！\n{qr_url}")
             
         recall_task = self._schedule_recall(client, msg_id, 110) if client and msg_id else None
         
@@ -267,8 +280,9 @@ class RocomPlugin(Star):
         """导入 WeGame 凭证"""
         user_id = event.get_sender_id()
         res = await self.client.import_token(tgp_id, tgp_ticket, user_id)
-        if not res or "frameworkToken" not in res:
-            yield event.plain_result("凭证导入失败。")
+        if not res or not res.get("frameworkToken"):
+            err_msg = res.get("message") if isinstance(res, dict) and res.get("message") else "凭证导入失败"
+            yield event.plain_result(f"{err_msg}。")
             return
         fw_token = res["frameworkToken"]
         async for r in self._save_binding_with_role_info(event, fw_token, "manual", user_id):
@@ -340,17 +354,83 @@ class RocomPlugin(Star):
             
     @filter.command("洛克刷新")
     async def rocom_refresh(self, event: AstrMessageEvent):
-        """刷新当前 QQ 扫码凭证"""
-        fw_token = await self._get_primary_token(event)
-        if not fw_token:
+        """刷新当前主账号凭证"""
+        user_id = event.get_sender_id()
+        binding = await self.user_mgr.get_primary_binding(user_id)
+        if not binding:
             async for res in self._not_logged_in_hint(event):
                 yield res
             return
-        res = await self.client.refresh_token(fw_token)
+
+        binding_id = binding.get("binding_id", "")
+        if not binding_id:
+            yield event.plain_result("绑定ID无效，请重新绑定账号。")
+            return
+
+        res = await self.client.refresh_binding(binding_id, user_id)
         if res and res.get("success"):
+            new_token = res.get("framework_token", "")
+            if new_token:
+                binding["framework_token"] = new_token
+                bindings = await self.user_mgr.get_user_bindings(user_id)
+                for i, b in enumerate(bindings):
+                    if b.get("binding_id") == binding_id:
+                        bindings[i] = binding
+                        break
+                await self.user_mgr.save_user_bindings(user_id, bindings)
             yield event.plain_result("当前账号凭证刷新成功。")
         else:
             yield event.plain_result("凭证刷新失败，可能已过期或不支持刷新（仅QQ扫码支持）。")
+
+    @filter.command("洛克删除无效绑定")
+    async def rocom_cleanup_bindings(self, event: AstrMessageEvent):
+        """删除当前用户的所有无效绑定（需要 bot 管理员权限）"""
+        # 检查 bot 管理员权限
+        if not event.is_admin():
+            uid = str(event.get_sender_id())
+            allowed = [u.strip() for u in self.config.get("allowed_users", "").split(",") if u.strip()]
+            if uid not in allowed:
+                yield event.plain_result("⚠️ 此指令仅限 bot 管理员使用。")
+                return
+
+        user_id = event.get_sender_id()
+        bindings = await self.user_mgr.get_user_bindings(user_id)
+        if not bindings:
+            yield event.plain_result("当前没有任何绑定记录。")
+            return
+
+        yield event.plain_result("正在检查绑定有效性...")
+
+        valid_bindings = []
+        invalid_count = 0
+
+        for binding in bindings:
+            fw_token = binding.get("framework_token", "")
+            binding_id = binding.get("binding_id", "")
+
+            if not fw_token and not binding_id:
+                invalid_count += 1
+                continue
+
+            role_res = await self.client.get_role(fw_token)
+            if role_res and isinstance(role_res, dict) and role_res.get("role"):
+                valid_bindings.append(binding)
+            else:
+                if binding_id:
+                    try:
+                        # 调用 API 删除服务端绑定
+                        await self.client.delete_binding(binding_id, str(user_id))
+                        logger.info(f"已删除服务端绑定 {binding_id}")
+                    except Exception as e:
+                        logger.warning(f"删除服务端绑定 {binding_id} 失败：{e}")
+                invalid_count += 1
+
+        await self.user_mgr.save_user_bindings(user_id, valid_bindings)
+
+        if invalid_count > 0:
+            yield event.plain_result(f"✅ 清理完成！共移除 {invalid_count} 个无效绑定，当前剩余 {len(valid_bindings)} 个有效绑定。")
+        else:
+            yield event.plain_result("✅ 所有绑定均有效，无需清理。")
 
     @filter.command("洛克档案", alias={"档案"})
     async def rocom_profile(self, event: AstrMessageEvent):
@@ -845,25 +925,33 @@ class RocomPlugin(Star):
             async for res in self._not_logged_in_hint(event):
                 yield res
             return
-            
+
         category = ""
         page_no = 1
-        
-        # 参数乱序识别
+
         for arg in [arg1, arg2]:
             if not arg: continue
             if isinstance(arg, int) or (isinstance(arg, str) and arg.isdigit()):
                 page_no = int(arg)
             else:
                 category = arg
-            
+
         hint_str = "💡 /洛克阵容 <分类> <页码> | 参数可交换位置，默认：热门推荐第1页"
         if category:
             hint_str = f"💡 当前分类：{category} | /洛克阵容 {category} 2 查看下一页"
-            
-        res = await self.client.get_lineup_list(fw_token, page_no=page_no, category=category)
+
+        try:
+            res = await self.client.get_lineup_list(fw_token, page_no=page_no, category=category)
+        except Exception as e:
+            yield event.plain_result(f"获取阵容数据异常：{str(e)}")
+            return
+
         if not res or "lineups" not in res:
-            yield event.plain_result("获取阵容数据失败。")
+            err_msg = res.get("message") if isinstance(res, dict) and res.get("message") else ""
+            if "frameworkToken" in str(err_msg) or "无效" in str(err_msg):
+                yield event.plain_result("【凭据过期】你的登录已过期，请重新使用 /洛克QQ登录 或 /洛克微信登录 绑定账号。")
+            else:
+                yield event.plain_result("获取阵容数据失败。")
             return
             
         # 处理阵容数据

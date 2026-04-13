@@ -242,6 +242,31 @@ class RocomClient:
             json_data=payload,
         )
 
+    async def refresh_binding(
+        self, binding_id: str, user_identifier: str
+    ) -> Optional[Dict]:
+        """刷新绑定凭证"""
+        user_identifier = self._sanitize_uid(user_identifier)
+        return await self._post(
+            f"/api/v1/user/bindings/{binding_id}/refresh",
+            self._wegame_headers(user_identifier=user_identifier),
+            json_data={},
+        )
+
+    async def get_bindings(
+        self, user_identifier: str = ""
+    ) -> Optional[Dict]:
+        """获取用户的绑定列表"""
+        user_identifier = self._sanitize_uid(user_identifier)
+        params = {}
+        if user_identifier:
+            params["user_identifier"] = user_identifier
+        return await self._get(
+            "/api/v1/user/bindings",
+            self._wegame_headers(user_identifier=user_identifier),
+            params=params,
+        )
+
     async def delete_binding(
         self, binding_id: str, user_identifier: str
     ) -> bool:
