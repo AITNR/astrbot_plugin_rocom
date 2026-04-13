@@ -410,12 +410,16 @@ class RocomPlugin(Star):
 
             if not fw_token and not binding_id:
                 invalid_count += 1
+                # 删除本地无效绑定
+                if binding_id:
+                    await self.user_mgr.remove_binding_by_id(user_id, binding_id)
                 continue
 
             role_res = await self.client.get_role(fw_token)
             if role_res and isinstance(role_res, dict) and role_res.get("role"):
                 valid_bindings.append(binding)
             else:
+                # 无效绑定：删除服务端 + 本地
                 if binding_id:
                     try:
                         # 调用 API 删除服务端绑定
@@ -423,6 +427,11 @@ class RocomPlugin(Star):
                         logger.info(f"已删除服务端绑定 {binding_id}")
                     except Exception as e:
                         logger.warning(f"删除服务端绑定 {binding_id} 失败：{e}")
+                    
+                    # 删除本地绑定
+                    await self.user_mgr.remove_binding_by_id(user_id, binding_id)
+                    logger.info(f"已删除本地绑定 {binding_id}")
+                
                 invalid_count += 1
 
         await self.user_mgr.save_user_bindings(user_id, valid_bindings)

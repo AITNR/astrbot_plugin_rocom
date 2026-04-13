@@ -111,7 +111,7 @@ class UserManager(AsyncDataManager):
         return removed
 
     async def switch_primary(self, user_id: Any, index: int) -> bool:
-        """按序号(1-based)切换主账号"""
+        """按序号 (1-based) 切换主账号"""
         user_id = str(user_id)
         bindings = await self.get_user_bindings(user_id)
         if not (1 <= index <= len(bindings)):
@@ -120,3 +120,16 @@ class UserManager(AsyncDataManager):
             b["is_primary"] = (i + 1 == index)
         await self.save_user_bindings(user_id, bindings)
         return True
+
+    async def remove_binding_by_id(self, user_id: Any, binding_id: str) -> bool:
+        """按 binding_id 删除指定绑定，返回是否删除成功"""
+        user_id = str(user_id)
+        async with self.lock:
+            bindings = self.data.get(user_id, [])
+            original_len = len(bindings)
+            bindings = [b for b in bindings if b.get("binding_id") != binding_id]
+            if len(bindings) < original_len:
+                self.data[user_id] = bindings
+                await self._save()
+                return True
+            return False
