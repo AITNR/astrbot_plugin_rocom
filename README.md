@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏰 astrbot\_plugin\_rocom
+# 🏰 astrbot\_plugin\_rocom 本插件前端正在构建，api无法获取
 
 ### *WeGame 洛克王国数据查询*
 
