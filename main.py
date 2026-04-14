@@ -16,7 +16,7 @@ from .core.client import RocomClient
 from .core.user import UserManager
 from .core.render import Renderer
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.3.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.4.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -571,7 +571,7 @@ class RocomPlugin(Star):
         if bl_res and bl_res.get("battles") and len(bl_res["battles"]) > 0:
             recent_battle = bl_res["battles"][0]
             data["hasBattleData"] = True
-            res_class = "win" if recent_battle.get("result") == 1 else "fail"
+            res_class = "fail" if recent_battle.get("result") == 1 else "win"
             data["matchResult"] = res_class
             data["opponentName"] = recent_battle.get("enemy_nickname", "")
             data["opponentAvatarDisplay"] = recent_battle.get("enemy_avatar_url", "")
@@ -628,7 +628,7 @@ class RocomPlugin(Star):
                     t_str = "未知"
                     d_str = "未知"
                     
-                res_class = "win" if b.get("result") == 1 else "fail"
+                res_class = "fail" if b.get("result") == 1 else "win"
                 
                 parsed_battles.append({
                     "time": t_str,

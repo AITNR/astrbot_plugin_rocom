@@ -38,6 +38,7 @@
         <div class="match-team match-team-left">
           <div class="match-player-info">
             <img class="match-player-avatar" src="{{battle.leftAvatar}}" alt="">
+            <img class="match-player-badge" src="{{battle.leftBadge}}" alt="" onerror="this.style.display='none'">
             <span class="match-player-name">{{battle.leftName}}</span>
           </div>
           <div class="match-pet-list">
@@ -56,6 +57,7 @@
         <div class="match-team match-team-right">
           <div class="match-player-info match-player-info-right">
             <span class="match-player-name">{{battle.rightName}}</span>
+            <img class="match-player-badge" src="{{battle.rightBadge}}" alt="" onerror="this.style.display='none'">
             <img class="match-player-avatar" src="{{battle.rightAvatar}}" alt="">
           </div>
           <div class="match-pet-list match-pet-list-right">
