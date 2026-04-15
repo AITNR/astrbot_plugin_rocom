@@ -133,3 +133,11 @@ class UserManager(AsyncDataManager):
                 await self._save()
                 return True
             return False
+
+    async def get_all_users_bindings(self) -> Dict[str, List[Dict]]:
+        """获取所有用户的绑定数据（深拷贝）"""
+        async with self.lock:
+            result = {}
+            for user_id, bindings in self.data.items():
+                result[user_id] = copy.deepcopy(bindings)
+            return result
