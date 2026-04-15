@@ -16,7 +16,7 @@ from .core.client import RocomClient
 from .core.user import UserManager
 from .core.render import Renderer
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.4.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.5.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -335,7 +335,6 @@ class RocomPlugin(Star):
             yield event.plain_result(msg)
 
     @filter.command("洛克切换")
-    @filter.command("洛克切换主账号")
     async def rocom_switch(self, event: AstrMessageEvent, index: int):
         """切换活跃主账号"""
         ok = await self.user_mgr.switch_primary(event.get_sender_id(), index)
@@ -386,7 +385,7 @@ class RocomPlugin(Star):
 
     @filter.command("洛克删除无效绑定")
     async def rocom_cleanup_bindings(self, event: AstrMessageEvent):
-        """删除当前用户的所有无效绑定（需要 bot 管理员权限）"""
+        """删除所有人的无效绑定（需要 bot 管理员权限）"""
         # 检查 bot 管理员权限
         if not event.is_admin():
             uid = str(event.get_sender_id())
@@ -395,53 +394,62 @@ class RocomPlugin(Star):
                 yield event.plain_result("⚠️ 此指令仅限 bot 管理员使用。")
                 return
 
-        user_id = event.get_sender_id()
-        bindings = await self.user_mgr.get_user_bindings(user_id)
-        if not bindings:
-            yield event.plain_result("当前没有任何绑定记录。")
-            return
+        yield event.plain_result("正在检查所有用户的绑定有效性...")
 
-        yield event.plain_result("正在检查绑定有效性...")
+        # 获取所有用户的绑定数据
+        all_users_data = await self.user_mgr.get_all_users_bindings()
+        total_users = len(all_users_data)
+        total_invalid = 0
+        total_valid = 0
 
-        valid_bindings = []
-        invalid_count = 0
-
-        for binding in bindings:
-            fw_token = binding.get("framework_token", "")
-            binding_id = binding.get("binding_id", "")
-
-            if not fw_token and not binding_id:
-                invalid_count += 1
-                # 删除本地无效绑定
-                if binding_id:
-                    await self.user_mgr.remove_binding_by_id(user_id, binding_id)
+        for user_id, bindings in all_users_data.items():
+            if not bindings:
                 continue
 
-            role_res = await self.client.get_role(fw_token)
-            if role_res and isinstance(role_res, dict) and role_res.get("role"):
-                valid_bindings.append(binding)
-            else:
-                # 无效绑定：删除服务端 + 本地
-                if binding_id:
-                    try:
-                        # 调用 API 删除服务端绑定
-                        await self.client.delete_binding(binding_id, str(user_id))
-                        logger.info(f"已删除服务端绑定 {binding_id}")
-                    except Exception as e:
-                        logger.warning(f"删除服务端绑定 {binding_id} 失败：{e}")
+            valid_bindings = []
+            invalid_count = 0
+
+            for binding in bindings:
+                fw_token = binding.get("framework_token", "")
+                binding_id = binding.get("binding_id", "")
+
+                if not fw_token and not binding_id:
+                    invalid_count += 1
+                    # 删除本地无效绑定
+                    if binding_id:
+                        await self.user_mgr.remove_binding_by_id(user_id, binding_id)
+                    continue
+
+                role_res = await self.client.get_role(fw_token)
+                if role_res and isinstance(role_res, dict) and role_res.get("role"):
+                    valid_bindings.append(binding)
+                else:
+                    # 无效绑定：删除服务端 + 本地
+                    if binding_id:
+                        try:
+                            # 调用 API 删除服务端绑定
+                            await self.client.delete_binding(binding_id, str(user_id))
+                            logger.info(f"已删除用户 {user_id} 的服务端绑定 {binding_id}")
+                        except Exception as e:
+                            logger.warning(f"删除用户 {user_id} 服务端绑定 {binding_id} 失败：{e}")
+                        
+                        # 删除本地绑定
+                        await self.user_mgr.remove_binding_by_id(user_id, binding_id)
+                        logger.info(f"已删除用户 {user_id} 本地绑定 {binding_id}")
                     
-                    # 删除本地绑定
-                    await self.user_mgr.remove_binding_by_id(user_id, binding_id)
-                    logger.info(f"已删除本地绑定 {binding_id}")
-                
-                invalid_count += 1
+                    invalid_count += 1
 
-        await self.user_mgr.save_user_bindings(user_id, valid_bindings)
+            # 保存该用户的有效绑定
+            if valid_bindings or invalid_count > 0:
+                await self.user_mgr.save_user_bindings(user_id, valid_bindings)
+            
+            total_invalid += invalid_count
+            total_valid += len(valid_bindings)
 
-        if invalid_count > 0:
-            yield event.plain_result(f"✅ 清理完成！共移除 {invalid_count} 个无效绑定，当前剩余 {len(valid_bindings)} 个有效绑定。")
+        if total_invalid > 0:
+            yield event.plain_result(f"✅ 清理完成！共检查 {total_users} 位用户，移除 {total_invalid} 个无效绑定，当前剩余 {total_valid} 个有效绑定。")
         else:
-            yield event.plain_result("✅ 所有绑定均有效，无需清理。")
+            yield event.plain_result(f"✅ 所有绑定均有效，无需清理。共检查 {total_users} 位用户，{total_valid} 个有效绑定。")
 
     @filter.command("洛克档案", alias={"档案"})
     async def rocom_profile(self, event: AstrMessageEvent):
