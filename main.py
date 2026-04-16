@@ -581,7 +581,7 @@ class RocomPlugin(Star):
             
     @filter.command("洛克刷新")
     async def rocom_refresh(self, event: AstrMessageEvent):
-        """刷新当前主账号凭证"""
+        """刷新当前主账号凭证，非必要不要使用"""
         user_id = event.get_sender_id()
         binding = await self.user_mgr.get_primary_binding(user_id)
         if not binding:
@@ -610,7 +610,7 @@ class RocomPlugin(Star):
 
     @filter.command("洛克删除无效绑定")
     async def rocom_cleanup_bindings(self, event: AstrMessageEvent):
-        """删除所有人的无效绑定（需要 bot 管理员权限）"""
+        """删除所有人的无效绑定（需要 bot 管理员权限，非必要不要使用）"""
         # 检查 bot 管理员权限
         if not event.is_admin():
             uid = str(event.get_sender_id())
