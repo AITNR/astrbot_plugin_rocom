@@ -20,7 +20,7 @@
   "auto_refresh_enabled": {
     "type": "bool",
     "description": "启用自动刷新",
-    "hint": "是否定时刷新所有用户凭证，非必要不用开启，服务端会自动刷新",
+    "hint": "定时刷新所有用户凭证，非必要不要开启！服务端会自动刷新",
     "default": false
   },
   "auto_refresh_time": {
