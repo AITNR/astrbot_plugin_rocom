@@ -1,19 +1,41 @@
 {
-  "api_base_url": {
-    "description": "API 服务后端地址",
-    "type": "string",
-    "default": "https://wegame.shallow.ink",
-    "hint": "除非自建服务端否则保持默认"
-  },
   "wegame_api_key": {
-    "description": "WeGame API Key",
     "type": "string",
-    "hint": "熵增开放平台 API Key，用于扫码登录及游戏数据查询，地址:前端未完工",
+    "description": "WeGame API Key",
+    "hint": "用于访问 WeGame API 的开发者密钥",
     "default": ""
   },
+  "api_base_url": {
+    "type": "string",
+    "description": "API 基础地址",
+    "hint": "WeGame API 服务器地址",
+    "default": "https://wegame.shallow.ink"
+  },
   "render_timeout": {
-    "description": "图片渲染超时时间(ms)",
     "type": "int",
+    "description": "渲染超时时间",
+    "hint": "图片渲染最大等待时间（毫秒）",
     "default": 30000
+  },
+  "auto_refresh_enabled": {
+    "type": "bool",
+    "description": "启用自动刷新",
+    "hint": "是否启用定时自动刷新所有用户的凭证",
+    "default": false
+  },
+  "auto_refresh_time": {
+    "type": "list",
+    "description": "自动刷新时间",
+    "hint": "每天自动刷新的时间点（24 小时制）",
+    "default": ["00:00", "12:00"],
+    "items": {
+      "type": "string"
+    }
+  },
+  "auto_refresh_notify_group": {
+    "type": "string",
+    "description": "刷新结果通知 UMO",
+    "hint": "自动刷新结果推送到此会话（填写完整的 UMO，如 default:GroupMessage:870543663）",
+    "default": ""
   }
 }

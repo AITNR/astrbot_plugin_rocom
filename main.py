@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 from astrbot.api import logger
-from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.event import filter, AstrMessageEvent, MessageChain
 from astrbot.api.star import Context, Star, register, StarTools
 from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import Plain, Image
@@ -16,7 +16,7 @@ from .core.client import RocomClient
 from .core.user import UserManager
 from .core.render import Renderer
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.5.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.7.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -37,7 +37,27 @@ class RocomPlugin(Star):
         res_path = os.path.abspath(os.path.dirname(__file__))
         self.renderer = Renderer(res_path=res_path, render_timeout=render_timeout)
         
+        # 自动刷新配置
+        self.auto_refresh_enabled = self.config.get("auto_refresh_enabled", False)
+        self.auto_refresh_time = self.config.get("auto_refresh_time", ["00:00", "12:00"])
+        self.auto_refresh_notify_group = self.config.get("auto_refresh_notify_group", "")
+        self._auto_refresh_task = None
+        
+        # 启动时检查是否需要开启自动刷新
+        logger.info(f"[Rocom] 插件初始化完成，自动刷新启用状态：{self.auto_refresh_enabled}, 刷新时间：{self.auto_refresh_time}, 通知群：{self.auto_refresh_notify_group}")
+        if self.auto_refresh_enabled:
+            self._auto_refresh_task = asyncio.create_task(self._auto_refresh_loop())
+            logger.info("[Rocom] 自动刷新任务已启动")
+        else:
+            logger.info("[Rocom] 自动刷新功能未启用")
+        
     async def terminate(self):
+        if self._auto_refresh_task and not self._auto_refresh_task.done():
+            self._auto_refresh_task.cancel()
+            try:
+                await self._auto_refresh_task
+            except asyncio.CancelledError:
+                pass
         await self.client.close()
         await self.renderer.close()
 
@@ -70,12 +90,209 @@ class RocomPlugin(Star):
 
     async def _get_primary_token(self, event: AstrMessageEvent) -> str:
         user_id = event.get_sender_id()
+        logger.debug(f"[Rocom] 获取主账号 Token，user_id: {user_id}")
         binding = await self.user_mgr.get_primary_binding(user_id)
         if not binding:
+            logger.warning(f"[Rocom] 用户 {user_id} 未绑定账号")
             return ""
         
         fw_token = binding.get("framework_token", "")
+        logger.debug(f"[Rocom] 用户 {user_id} 的主账号 Token: {fw_token[:8]}...")
         return fw_token
+
+    async def _auto_refresh_loop(self):
+        """自动刷新循环任务"""
+        logger.info("[自动刷新] 任务已启动")
+        
+        # 记录上次刷新的时间点，避免同一分钟内重复刷新
+        last_refresh_minute = None
+        
+        while True:
+            try:
+                now = datetime.now()
+                current_time = f"{now.hour:02d}:{now.minute:02d}"
+                current_minute_ts = int(now.timestamp()) // 60  # 当前分钟的 timestamp
+                
+                # 调试：每分钟记录一次当前时间和配置时间
+                logger.debug(f"[自动刷新] 当前时间：{current_time}, 配置的刷新时间：{self.auto_refresh_time}, 类型：{type(self.auto_refresh_time)}")
+                
+                # 检查是否到达刷新时间
+                # 确保 auto_refresh_time 是列表
+                refresh_times = self.auto_refresh_time if isinstance(self.auto_refresh_time, list) else [self.auto_refresh_time]
+                
+                # 如果当前时间在刷新时间列表中，并且这一分钟内还没有刷新过
+                if current_time in refresh_times and last_refresh_minute != current_minute_ts:
+                    logger.info(f"[自动刷新] 检测到刷新时间 {current_time}，开始执行...")
+                    await self._do_auto_refresh()
+                    last_refresh_minute = current_minute_ts
+                    logger.info(f"[自动刷新] 刷新任务完成，下次刷新时间：{refresh_times}")
+                
+                # 每分钟检查一次
+                await asyncio.sleep(60)
+                
+            except asyncio.CancelledError:
+                logger.info("[自动刷新] 任务已取消")
+                break
+            except Exception as e:
+                logger.error(f"[自动刷新] 任务异常：{e}")
+                await asyncio.sleep(60)
+
+    async def _do_auto_refresh(self):
+        """执行自动刷新"""
+        all_users_data = await self.user_mgr.get_all_users_bindings()
+        
+        total_users = len(all_users_data)
+        success_count = 0
+        fail_count = 0
+        results = []
+        
+        for user_id, bindings in all_users_data.items():
+            if not bindings:
+                continue
+            
+            for binding in bindings:
+                binding_id = binding.get("binding_id", "")
+                if not binding_id:
+                    continue
+                
+                # 只刷新 QQ 登录的凭证（只有 QQ 扫码支持刷新）
+                if binding.get("login_type") != "qq":
+                    continue
+                
+                try:
+                    res = await self.client.refresh_binding(binding_id, user_id)
+                    if res and res.get("framework_token"):
+                        new_token = res["framework_token"]
+                        binding["framework_token"] = new_token
+                        
+                        # 更新本地存储
+                        user_bindings = await self.user_mgr.get_user_bindings(user_id)
+                        for i, b in enumerate(user_bindings):
+                            if b.get("binding_id") == binding_id:
+                                user_bindings[i] = binding
+                                break
+                        await self.user_mgr.save_user_bindings(user_id, user_bindings)
+                        
+                        success_count += 1
+                        results.append(f"✅ 用户 {user_id} ({binding.get('nickname', '未知')}) 刷新成功")
+                        logger.info(f"[自动刷新] 用户 {user_id} 凭证刷新成功")
+                    else:
+                        fail_count += 1
+                        results.append(f"❌ 用户 {user_id} ({binding.get('nickname', '未知')}) 刷新失败")
+                        logger.warning(f"[自动刷新] 用户 {user_id} 凭证刷新失败")
+                except Exception as e:
+                    fail_count += 1
+                    results.append(f"❌ 用户 {user_id} ({binding.get('nickname', '未知')}) 异常：{e}")
+                    logger.error(f"[自动刷新] 用户 {user_id} 凭证刷新异常：{e}")
+        
+        # 发送通知
+        msg = f"【自动刷新结果】\n时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        msg += f"总用户数：{total_users}\n"
+        msg += f"成功：{success_count} | 失败：{fail_count}\n\n"
+        if results:
+            msg += "\n".join(results[:10])  # 最多显示 10 条
+            if len(results) > 10:
+                msg += f"\n... 还有 {len(results) - 10} 条结果"
+        
+        # 发送到指定群
+        if self.auto_refresh_notify_group and success_count > 0 or fail_count > 0:
+            try:
+                from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
+                # 创建一个假 event 用于发送消息
+                await self._send_notify_to_group(msg)
+            except Exception as e:
+                logger.error(f"[自动刷新] 发送通知失败：{e}")
+        
+        logger.info(f"[自动刷新] 执行完成：成功{success_count}，失败{fail_count}")
+
+    @filter.command("洛克刷新所有凭证")
+    async def rocom_refresh_all(self, event: AstrMessageEvent):
+        """刷新所有用户的凭证（需要 bot 管理员权限）"""
+        # 检查 bot 管理员权限
+        if not event.is_admin():
+            uid = str(event.get_sender_id())
+            allowed = [u.strip() for u in self.config.get("allowed_users", "").split(",") if u.strip()]
+            if uid not in allowed:
+                yield event.plain_result("⚠️ 此指令仅限 bot 管理员使用。")
+                return
+
+        yield event.plain_result("💡 提示：插件已配置自动刷新凭证功能（默认每天 00:00 和 12:00），本指令仅作调试或强制兜底使用。\n\n正在刷新所有用户的凭证...")
+
+        all_users_data = await self.user_mgr.get_all_users_bindings()
+        
+        total_users = len(all_users_data)
+        success_count = 0
+        fail_count = 0
+        skipped_count = 0
+        results = []
+        
+        for user_id, bindings in all_users_data.items():
+            if not bindings:
+                continue
+            
+            for binding in bindings:
+                binding_id = binding.get("binding_id", "")
+                if not binding_id:
+                    continue
+                
+                # 只刷新 QQ 登录的凭证（只有 QQ 扫码支持刷新）
+                login_type = binding.get("login_type", "")
+                if login_type != "qq":
+                    skipped_count += 1
+                    continue
+                
+                try:
+                    res = await self.client.refresh_binding(binding_id, user_id)
+                    if res and res.get("framework_token"):
+                        new_token = res["framework_token"]
+                        binding["framework_token"] = new_token
+                        
+                        # 更新本地存储
+                        user_bindings = await self.user_mgr.get_user_bindings(user_id)
+                        for i, b in enumerate(user_bindings):
+                            if b.get("binding_id") == binding_id:
+                                user_bindings[i] = binding
+                                break
+                        await self.user_mgr.save_user_bindings(user_id, user_bindings)
+                        
+                        success_count += 1
+                        results.append(f"✅ 用户 {user_id} ({binding.get('nickname', '未知')}) 刷新成功")
+                        logger.info(f"[手动刷新所有] 用户 {user_id} 凭证刷新成功")
+                    else:
+                        fail_count += 1
+                        results.append(f"❌ 用户 {user_id} ({binding.get('nickname', '未知')}) 刷新失败")
+                        logger.warning(f"[手动刷新所有] 用户 {user_id} 凭证刷新失败")
+                except Exception as e:
+                    fail_count += 1
+                    results.append(f"❌ 用户 {user_id} ({binding.get('nickname', '未知')}) 异常：{e}")
+                    logger.error(f"[手动刷新所有] 用户 {user_id} 凭证刷新异常：{e}")
+        
+        msg = f"【刷新所有凭证完成】\n"
+        msg += f"总用户数：{total_users}\n"
+        msg += f"成功：{success_count} | 失败：{fail_count} | 跳过（非 QQ）: {skipped_count}\n\n"
+        if results:
+            msg += "\n".join(results[:20])  # 最多显示 20 条
+            if len(results) > 20:
+                msg += f"\n... 还有 {len(results) - 20} 条结果"
+        
+        yield event.plain_result(msg)
+
+    async def _send_notify_to_group(self, message: str):
+        """发送通知到指定群"""
+        try:
+            if self.auto_refresh_notify_group:
+                session_id = self.auto_refresh_notify_group.strip()
+                # 创建 MessageChain 对象
+                chain = MessageChain()
+                chain.chain.append(Plain(message))
+                # 直接使用用户填写的完整 UMO
+                await self.context.send_message(
+                    session_id,
+                    chain
+                )
+                logger.info(f"[自动刷新] 通知已发送到 {session_id}")
+        except Exception as e:
+            logger.error(f"[自动刷新] 发送群消息失败：{e}")
 
     @filter.command("洛克")
     async def rocom_help(self, event: AstrMessageEvent):
@@ -87,10 +304,11 @@ class RocomPlugin(Star):
                 {
                     "groupTitle": "账号管理与登录",
                     "menuItems": [
-                        {"cmd": "洛克QQ登录", "desc": "使用 QQ 扫码快捷登录及绑定"},
+                        {"cmd": "洛克 QQ 登录", "desc": "使用 QQ 扫码快捷登录及绑定"},
                         {"cmd": "洛克微信登录", "desc": "使用微信扫码快捷登录及绑定"},
                         {"cmd": "洛克导入 <ID> <Ticket>", "desc": "通过客户端凭证手动登录"},
                         {"cmd": "洛克刷新", "desc": "刷新当前主账号 QQ 凭证"},
+                        {"cmd": "洛克刷新所有凭证", "desc": "刷新所有用户的凭证 (管理员，仅作调试或强制兜底)"},
                         {"cmd": "洛克删除无效绑定", "desc": "清理失效的绑定记录 (管理员)"}
                     ]
                 },
@@ -130,7 +348,14 @@ class RocomPlugin(Star):
         
         yield event.plain_result("绑定成功，正在获取角色信息...")
         role_res = await self.client.get_role(fw_token)
-        role = role_res.get("role", {}) if role_res else {}
+        
+        # 检查角色信息获取是否成功
+        if not role_res or not role_res.get("role"):
+            logger.warning(f"[Rocom] 获取角色信息失败，fw_token 可能无效或过期")
+            yield event.plain_result("⚠️ 绑定成功，但获取角色信息失败（凭证可能无效或已过期）。请尝试重新登录。")
+            return
+        
+        role = role_res.get("role", {})
         
         binding_data = bind_res.get("binding", {})
         binding_id = binding_data.get("id", fw_token)
@@ -141,10 +366,11 @@ class RocomPlugin(Star):
             "login_type": login_type,
             "role_id": role.get("id", "未知"),
             "nickname": role.get("name", "洛克"),
-            "bind_time": int(time.time() * 1000)
+            "bind_time": int(time.time() * 1000),
+            "is_primary": True
         }
         await self.user_mgr.add_binding(user_id, binding)
-        yield event.plain_result(f"绑定成功！当前账号：{binding['nickname']} (ID: {binding['role_id']})")
+        yield event.plain_result(f"✅ 绑定成功！当前账号：{binding['nickname']} (ID: {binding['role_id']})")
 
     async def _not_logged_in_hint(self, event: AstrMessageEvent):
         """统一的未登录引导"""
@@ -365,23 +591,22 @@ class RocomPlugin(Star):
 
         binding_id = binding.get("binding_id", "")
         if not binding_id:
-            yield event.plain_result("绑定ID无效，请重新绑定账号。")
+            yield event.plain_result("绑定 ID 无效，请重新绑定账号。")
             return
 
         res = await self.client.refresh_binding(binding_id, user_id)
-        if res and res.get("success"):
-            new_token = res.get("framework_token", "")
-            if new_token:
-                binding["framework_token"] = new_token
-                bindings = await self.user_mgr.get_user_bindings(user_id)
-                for i, b in enumerate(bindings):
-                    if b.get("binding_id") == binding_id:
-                        bindings[i] = binding
-                        break
-                await self.user_mgr.save_user_bindings(user_id, bindings)
+        if res and res.get("framework_token"):
+            new_token = res["framework_token"]
+            binding["framework_token"] = new_token
+            bindings = await self.user_mgr.get_user_bindings(user_id)
+            for i, b in enumerate(bindings):
+                if b.get("binding_id") == binding_id:
+                    bindings[i] = binding
+                    break
+            await self.user_mgr.save_user_bindings(user_id, bindings)
             yield event.plain_result("当前账号凭证刷新成功。")
         else:
-            yield event.plain_result("凭证刷新失败，可能已过期或不支持刷新（仅QQ扫码支持）。")
+            yield event.plain_result("凭证刷新失败，可能已过期或不支持刷新（仅 QQ 扫码支持）。")
 
     @filter.command("洛克删除无效绑定")
     async def rocom_cleanup_bindings(self, event: AstrMessageEvent):
