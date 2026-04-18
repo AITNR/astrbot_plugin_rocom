@@ -1,5 +1,3 @@
-<img width="1840" height="6164" alt="6bd48e838ede2c2784681cef61bb0c76" src="https://github.com/user-attachments/assets/1b97d316-95f7-4bca-80e3-06f5c3334b24" /><div align="center">
-
 # 🏰 astrbot\_plugin\_rocom
 # 由于前端正在构建，正式发布前端前可使用测试
 # key：sk-ff14f964051a5c966564e29b5bd3a768
