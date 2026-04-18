@@ -406,14 +406,29 @@ class RocomPlugin(Star):
     async def _is_group_admin(self, event: AstrMessageEvent) -> bool:
         if event.is_private_chat():
             return False
-        if getattr(event, "role", "") == "admin":
-            return True
+        sender_id = str(event.get_sender_id())
+        role = str(getattr(event, "role", "") or "").lower()
         try:
             group = await event.get_group()
-            if group and str(event.get_sender_id()) in [str(x) for x in getattr(group, "group_admins", [])]:
-                return True
+            if group:
+                owner_candidates = [
+                    getattr(group, "group_owner", None),
+                    getattr(group, "owner_id", None),
+                    getattr(group, "group_owner_id", None),
+                ]
+                if any(str(owner) == sender_id for owner in owner_candidates if owner is not None):
+                    return True
+
+                admins = [str(x) for x in getattr(group, "group_admins", [])]
+                if sender_id in admins:
+                    return True
+
+                # 允许 bot 管理员通过；群信息优先，事件角色作为补充
+                if role in {"admin", "owner"}:
+                    return True
         except Exception:
-            pass
+            if role in {"admin", "owner"}:
+                return True
         return False
 
 
