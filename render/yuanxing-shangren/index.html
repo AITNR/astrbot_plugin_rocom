@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -13,15 +13,13 @@
 
 :root {
     --font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
-    --text-1: #3a2f24;
-    --text-2: #5c4a37;
-    --text-3: #75624d;
-    --gold-1: #b5791f;
-    --green-1: #2f9750;
-    --orange-1: #b1772c;
-    --base-rgb: 232, 225, 209;
-    --panel-bg: rgb(var(--base-rgb));
-    --line: rgba(118, 97, 74, 0.3);
+    --text-1: #332719;
+    --text-2: #6b5846;
+    --line: rgba(118, 97, 74, 0.22);
+    --panel-bg: rgba(243, 237, 227, 0.94);
+    --card-bg: rgba(255, 252, 247, 0.82);
+    --tag-bg: rgba(255, 214, 153, 0.4);
+    --tag-text: #9a5f19;
 }
 
 html,
@@ -30,16 +28,14 @@ body {
     height: auto;
     font-family: var(--font-family);
     color: var(--text-1);
-    background: rgb(var(--base-rgb));
+    background: #ece3d3;
 }
 
 .merchant-page {
     position: relative;
     width: 100%;
-    min-height: 0;
-    height: auto;
-    overflow: visible;
-    background: rgb(var(--base-rgb));
+    overflow: hidden;
+    background: #ece3d3;
 }
 
 .background {
@@ -48,35 +44,32 @@ body {
     background-size: cover;
     background-position: center top;
     background-repeat: no-repeat;
-    opacity: 1;
-    z-index: 0;
+    opacity: 0.24;
+    filter: saturate(0.9);
 }
 
 .content-container {
     position: relative;
     z-index: 1;
     width: 100%;
-    margin: 0 auto;
-    padding: 0 0 8px;
+    padding: 18px 18px 24px;
 }
 
 .header {
     display: flex;
-    align-items: stretch;
     justify-content: space-between;
-    margin-bottom: 18px;
-    padding: 18px 24px;
-    border-radius: 0;
-    border-top: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    background: var(--panel-bg);
+    gap: 20px;
+    padding: 22px 24px;
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.86), rgba(245,236,221,0.9));
+    box-shadow: 0 14px 36px rgba(58, 39, 21, 0.08);
 }
 
 .title-section {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 .title-main {
@@ -85,319 +78,197 @@ body {
     gap: 14px;
 }
 
-.title-icon-img {
+.title-badge {
+    width: 68px;
+    height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: #fffaf0;
+    font-size: 32px;
+    font-weight: 900;
+}
+
+.title-badge img {
     width: 68px;
     height: 68px;
     object-fit: contain;
 }
 
 .title-text {
-    font-size: 40px;
-    font-weight: 800;
-    letter-spacing: 3px;
-    color: var(--text-1);
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: 2px;
 }
 
 .subtitle {
-    margin-top: 0;
     color: var(--text-2);
     font-size: 18px;
 }
 
-.header-right {
+.header-side {
+    min-width: 320px;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     justify-content: center;
-    gap: 10px;
-    min-width: 320px;
-    padding-left: 24px;
-    border-left: 1px solid rgba(118, 97, 74, 0.3);
+    gap: 14px;
 }
 
-.header-balance {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
+.summary-chip {
+    padding: 10px 16px;
     border-radius: 999px;
-    padding: 8px 16px;
-    border: 1px solid rgba(191, 141, 67, 0.5);
-    background: linear-gradient(135deg, rgba(245, 227, 184, 0.95), rgba(233, 215, 173, 0.95));
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(179, 123, 45, 0.2);
+    color: var(--text-2);
+    font-size: 18px;
 }
 
-.currency-icon,
-.price-icon {
-    width: 22px;
-    height: 22px;
-    object-fit: contain;
-    image-rendering: high-quality;
-}
-
-.amount-value {
-    color: var(--gold-1);
-    font-size: 30px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
+.summary-chip strong {
+    color: #a0631d;
+    font-size: 28px;
+    margin-left: 8px;
 }
 
 .round-info {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding-top: 8px;
-    border-top: 1px dashed rgba(118, 97, 74, 0.35);
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
-.round-label {
-    font-size: 20px;
-    font-weight: 800;
-}
-
-.round-count {
-    margin-left: 0;
+.round-pill,
+.countdown-pill {
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.78);
+    border: 1px solid var(--line);
     font-size: 17px;
-    color: var(--text-3);
 }
 
-.countdown {
+.countdown-pill {
     color: #bf5f3f;
     font-weight: 700;
-    font-size: 18px;
-    letter-spacing: 0.5px;
-    margin-left: 10px;
 }
 
 .products-grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: 16px;
-    padding: 0 12px;
+    margin-top: 18px;
 }
 
 .product-card {
     display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(260px, auto);
+    grid-template-columns: 140px 1fr auto;
+    gap: 18px;
     align-items: center;
-    gap: 20px;
-    border-radius: 18px;
-    border: none;
-    background: linear-gradient(90deg,
-        rgba(214, 206, 190, 1) 0%,
-        rgba(214, 206, 190, 0.96) 56%,
-        rgba(214, 206, 190, 0.72) 80%,
-        rgba(214, 206, 190, 0) 100%);
-    min-height: 154px;
-    padding: 22px;
-    transition: transform 0.18s ease;
-}
-
-.product-card:hover {
-    transform: translateY(-2px);
-}
-
-.product-main-left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    min-width: 0;
+    min-height: 156px;
+    padding: 18px 22px;
+    border: 1px solid rgba(118, 97, 74, 0.14);
+    border-radius: 22px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(244,236,224,0.88));
+    box-shadow: 0 10px 26px rgba(58, 39, 21, 0.06);
 }
 
 .product-image-container {
-    width: 156px;
-    height: 156px;
-    flex-shrink: 0;
-    border-radius: 0;
-    border: none;
-    background: transparent;
+    width: 140px;
+    height: 140px;
+    border-radius: 18px;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.94), rgba(239,228,210,0.92));
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
+    overflow: hidden;
 }
 
 .product-image {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    image-rendering: high-quality;
+}
+
+.product-main {
+    min-width: 0;
 }
 
 .product-name {
-    min-width: 0;
-    color: #3a2f24;
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1.24;
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1.2;
     word-break: break-word;
 }
 
-.product-main-right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 12px;
+.product-sub {
+    margin-top: 10px;
+    color: var(--text-2);
+    font-size: 18px;
 }
 
-.product-meta-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.product-stat {
+.product-time {
     display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 20px;
+    margin-top: 14px;
     padding: 8px 14px;
     border-radius: 999px;
-    border: 1px solid transparent;
-    white-space: nowrap;
-}
-
-.product-stat .label {
-    color: #6d5843;
-}
-
-.product-stat .value {
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    font-size: 16px;
     font-weight: 700;
 }
 
-.product-stock {
-    border-color: rgba(90, 160, 95, 0.35);
-    background: rgba(203, 232, 200, 0.85);
+.product-side {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
 }
 
-.product-stock .value {
-    color: var(--green-1);
-}
-
-.product-limit {
-    border-color: rgba(219, 160, 82, 0.35);
-    background: rgba(246, 225, 192, 0.92);
-}
-
-.product-limit .value {
-    color: var(--orange-1);
-}
-
-.product-price {
-    border-color: rgba(191, 141, 67, 0.45);
-    background: rgba(247, 230, 197, 0.95);
-}
-
-.product-price .value {
-    color: var(--gold-1);
-    font-size: 32px;
-    line-height: 1;
+.product-slot {
+    padding: 10px 14px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(179, 123, 45, 0.18);
+    color: #8b5e2b;
+    font-size: 18px;
+    font-weight: 700;
 }
 
 .product-empty {
-    grid-column: 1 / -1;
     text-align: center;
     padding: 30px 18px;
-    border-radius: 18px;
+    border-radius: 22px;
     border: 1px dashed rgba(120, 102, 81, 0.35);
     color: #5c4a37;
     font-size: 22px;
-    background: rgb(var(--base-rgb));
-}
-
-@media (max-width: 760px) {
-    .content-container {
-        padding: 0 0 16px;
-    }
-
-    .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 16px;
-        border-radius: 0;
-    }
-
-    .header-right {
-        width: 100%;
-        min-width: 0;
-        align-items: flex-start;
-        padding-left: 0;
-        padding-top: 12px;
-        border-left: none;
-        border-top: 1px solid rgba(118, 97, 74, 0.3);
-    }
-
-    .title-icon-img {
-        width: 54px;
-        height: 54px;
-    }
-
-    .title-text {
-        font-size: 30px;
-        letter-spacing: 1px;
-    }
-
-    .amount-value {
-        font-size: 24px;
-    }
-
-    .products-grid {
-        padding: 0 8px;
-    }
-
-    .product-card {
-        grid-template-columns: 1fr;
-        min-height: 0;
-        padding: 16px;
-    }
-
-    .product-main-right {
-        align-items: flex-start;
-        gap: 10px;
-    }
-
-    .product-name {
-        font-size: 24px;
-    }
-
-    .product-image-container {
-        width: 136px;
-        height: 136px;
-    }
-
-    .product-stat {
-        font-size: 17px;
-        padding: 6px 10px;
-    }
-
-    .product-price .value {
-        font-size: 26px;
-    }
+    background: rgba(255,255,255,0.52);
 }
     </style>
 </head>
 <body>
     <div class="merchant-page">
         <div class="background" style="background-image: url('{{background}}');"></div>
-
         <div class="content-container">
             <div class="header">
                 <div class="title-section">
                     <div class="title-main">
-                        <img class="title-icon-img" src="{{titleIcon}}" alt="商人图标">
+                        <div class="title-badge">
+                            {% if titleIcon %}
+                            <img src="{{_res_path}}img/yuanxingshangren.png" alt="{{title}}">
+                            {% else %}
+                            远
+                            {% endif %}
+                        </div>
                         <span class="title-text">{{title}}</span>
                     </div>
                     <div class="subtitle">{{subtitle}}</div>
                 </div>
-                <div class="header-right">
-                    <div class="header-balance" aria-label="{{currency.name}}">
-                        <img class="currency-icon" src="{{currency.icon}}" alt="金币图标">
-                        <span class="amount-value">{{currency.amount}}</span>
-                    </div>
+                <div class="header-side">
+                    <div class="summary-chip">当前商品数 <strong>{{product_count}}</strong></div>
                     <div class="round-info">
-                        <span class="round-label">常规商品</span>
-                        <span class="round-count">({{round_info.current}}/{{round_info.total}}轮)</span>
-                        <span class="countdown">⏱ {{round_info.countdown}}</span>
+                        <div class="round-pill">第 {{round_info.current or '未开放'}} / {{round_info.total}} 轮</div>
+                        <div class="countdown-pill">剩余 {{round_info.countdown}}</div>
                     </div>
                 </div>
             </div>
@@ -406,27 +277,16 @@ body {
                 {% if products and products|length > 0 %}
                 {% for product in products %}
                 <div class="product-card">
-                    <div class="product-main-left">
-                        <div class="product-image-container">
-                            <img class="product-image" src="{{product.image}}" alt="{{product.name}}">
-                        </div>
-                        <div class="product-name">{{product.name}}</div>
+                    <div class="product-image-container">
+                        <img class="product-image" src="{{product.image}}" alt="{{product.name}}">
                     </div>
-                    <div class="product-main-right">
-                        <div class="product-meta-row">
-                            <div class="product-stat product-stock">
-                                <span class="label">库存</span>
-                                <span class="value">{{product.stock}}</span>
-                            </div>
-                            <div class="product-stat product-limit">
-                                <span class="label">限购</span>
-                                <span class="value">{{product.limit}}</span>
-                            </div>
-                        </div>
-                        <div class="product-stat product-price">
-                            <img class="price-icon" src="{{currency.icon}}" alt="金币图标">
-                            <span class="value">{{product.price}}</span>
-                        </div>
+                    <div class="product-main">
+                        <div class="product-name">{{product.name}}</div>
+                        <div class="product-sub">远行商人当前轮次商品</div>
+                        <div class="product-time">北京时间 {{product.time_label}}</div>
+                    </div>
+                    <div class="product-side">
+                        <div class="product-slot">本轮商品</div>
                     </div>
                 </div>
                 {% endfor %}
@@ -438,5 +298,3 @@ body {
     </div>
 </body>
 </html>
-
-

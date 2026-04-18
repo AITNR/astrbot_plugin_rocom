@@ -11,6 +11,7 @@ import asyncio
 import base64
 import mimetypes
 import uuid
+import tempfile
 import jinja2
 from typing import Dict, Any, Optional
 from astrbot.api import logger
@@ -37,6 +38,7 @@ class Renderer:
         self._playwright = None
         self._lock = asyncio.Lock()
         self._cache_cleanup_task: Optional[asyncio.Task] = None
+        self._browser_launch_mode: Optional[str] = None
         self._output_dir = os.path.abspath(
             os.path.join(self.res_path, "render_cache")
         )
@@ -329,6 +331,8 @@ class Renderer:
                         '.record-page', 
                         '.package-cont',
                         '.searcheggs-cont',
+                        '.bwiki-shell',
+                        '.skill-shell',
                         '.page-section-main',
                         '.lineup-page'
                     ];
@@ -341,14 +345,15 @@ class Renderer:
                 }
             """)
             box = await el.bounding_box() if el else None
-            if box:
+            if box and el:
                 await page.set_viewport_size(
                     {
-                        "width": int(box["width"]),
-                        "height": int(box["height"]),
+                        "width": max(int(box["width"]) + 8, 200),
+                        "height": max(int(box["height"]) + 8, 200),
                     }
                 )
-                await page.screenshot(path=output_path, clip=box, type="png")
+                await page.wait_for_timeout(100)
+                await el.screenshot(path=output_path, type="png")
             else:
                 await page.screenshot(path=output_path, full_page=True)
 

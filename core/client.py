@@ -25,6 +25,16 @@ class RocomClient:
         self.wegame_api_key = wegame_api_key
         self.timeout = timeout
         self._client: Optional[httpx.AsyncClient] = None
+        self.last_error_message: str = ""
+
+    def _set_last_error(self, message: str) -> None:
+        self.last_error_message = message
+
+    def _clear_last_error(self) -> None:
+        self.last_error_message = ""
+
+    def get_last_error(self, default: str = "接口异常") -> str:
+        return self.last_error_message or default
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -67,6 +77,7 @@ class RocomClient:
         self, path: str, headers: Dict[str, str], params: Optional[Dict] = None
     ) -> Optional[Dict]:
         try:
+            self._clear_last_error()
             client = await self._get_client()
             resp = await client.get(
                 f"{self.base_url}{path}", headers=headers, params=params
@@ -476,19 +487,60 @@ class RocomClient:
 
     async def get_exchange_posters(
         self,
-        fw_token: str,
+        fw_token: str = "",
         page_no: int = 1,
         refresh: bool = False,
         account_type: int | None = None,
     ) -> Optional[Dict]:
         """查询交换大厅海报列表"""
-        params = {"page_no": page_no, "refresh": "true" if refresh else "false"}
+        params = {
+            "page_no": max(int(page_no or 1), 1),
+            "refresh": "true" if refresh else "false",
+        }
         if account_type:
             params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/exchange/posters",
-            self._rocom_headers(fw_token),
+            self._wegame_headers(fw_token),
             params,
+        )
+
+    async def get_merchant_info(self, refresh: bool = False) -> Optional[Dict]:
+        """Query merchant activity data."""
+        params = {"refresh": "true" if refresh else "false"}
+        return await self._get(
+            "/api/v1/games/rocom/merchant/info",
+            self._wegame_headers(),
+            params=params,
+        )
+
+    async def query_pet_size(
+        self, diameter: float, weight: float
+    ) -> Optional[Dict]:
+        """Query pet candidates by size."""
+        params = {"diameter": diameter, "weight": weight}
+        return await self._get(
+            "/api/v1/games/rocom/pet/size-query",
+            self._wegame_headers(),
+            params=params,
+        )
+
+    async def search_wiki_pet(self, query: str, limit: int = 10) -> Optional[Dict]:
+        """Search pet wiki entries."""
+        params = {"q": query, "limit": limit}
+        return await self._get(
+            "/api/v1/games/rocom/wiki/pet",
+            self._wegame_headers(),
+            params=params,
+        )
+
+    async def search_wiki_skill(self, query: str, limit: int = 10) -> Optional[Dict]:
+        """Search skill wiki entries."""
+        params = {"q": query, "limit": limit}
+        return await self._get(
+            "/api/v1/games/rocom/wiki/skill",
+            self._wegame_headers(),
+            params=params,
         )
 
     async def close(self):

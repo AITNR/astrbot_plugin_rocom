@@ -141,3 +141,33 @@ class UserManager(AsyncDataManager):
             for user_id, bindings in self.data.items():
                 result[user_id] = copy.deepcopy(bindings)
             return result
+
+
+class MerchantSubscriptionManager(AsyncDataManager):
+    """Per-group merchant subscription storage."""
+
+    def __init__(self, data_dir: str):
+        super().__init__(data_dir, "rocom_merchant_subscriptions.json", {})
+
+    async def upsert_subscription(self, group_key: str, subscription: Dict[str, Any]):
+        async with self.lock:
+            self.data[str(group_key)] = copy.deepcopy(subscription)
+            await self._save()
+
+    async def get_subscription(self, group_key: str) -> Optional[Dict[str, Any]]:
+        async with self.lock:
+            item = self.data.get(str(group_key))
+            return copy.deepcopy(item) if item else None
+
+    async def delete_subscription(self, group_key: str) -> bool:
+        async with self.lock:
+            key = str(group_key)
+            if key not in self.data:
+                return False
+            del self.data[key]
+            await self._save()
+            return True
+
+    async def get_all_subscriptions(self) -> Dict[str, Dict[str, Any]]:
+        async with self.lock:
+            return copy.deepcopy(self.data)

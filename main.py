@@ -3,7 +3,7 @@ import time
 import base64
 import tempfile
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
 from astrbot.api import logger
@@ -13,11 +13,11 @@ from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import Plain, Image
 
 from .core.client import RocomClient
-from .core.user import UserManager
+from .core.user import UserManager, MerchantSubscriptionManager
 from .core.render import Renderer
-from .render.searcheggs.eggs import EggSearcher, SearchResult
+from .core.egg_service import EggService, SearchResult
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.8.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.0.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -32,6 +32,7 @@ class RocomPlugin(Star):
         
         data_dir = str(StarTools.get_data_dir())
         self.user_mgr = UserManager(data_dir)
+        self.merchant_sub_mgr = MerchantSubscriptionManager(data_dir)
         
         render_timeout = self.config.get("render_timeout", 30000)
         # res_path point to astrbot_plugin_rocom directory
@@ -46,7 +47,18 @@ class RocomPlugin(Star):
         
         # 初始化查蛋模块（数据自包含在 render/searcheggs/ 下）
         searcheggs_dir = os.path.join(res_path, "render", "searcheggs")
-        self.egg_searcher = EggSearcher(searcheggs_dir)
+        self.egg_searcher = EggService(searcheggs_dir)
+        self.merchant_subscription_enabled = self.config.get(
+            "merchant_subscription_enabled", True
+        )
+        self.merchant_subscription_items = self.config.get(
+            "merchant_subscription_items", ["国王球", "棱镜球", "炫彩精灵蛋"]
+        )
+        self.merchant_check_cron = self.config.get(
+            "merchant_check_cron", "*/5 * * * *"
+        )
+        self._merchant_cron_job_id = None
+        self._merchant_job_setup_task = None
         
         # 启动时检查是否需要开启自动刷新
         logger.info(f"[Rocom] 插件初始化完成，自动刷新启用状态：{self.auto_refresh_enabled}, 刷新时间：{self.auto_refresh_time}, 通知群：{self.auto_refresh_notify_group}")
@@ -56,7 +68,24 @@ class RocomPlugin(Star):
         else:
             logger.info("[Rocom] 自动刷新功能未启用")
         
+        if self.merchant_subscription_enabled:
+            self._merchant_job_setup_task = asyncio.create_task(
+                self._register_merchant_subscription_job()
+            )
+
     async def terminate(self):
+        if self._merchant_job_setup_task and not self._merchant_job_setup_task.done():
+            self._merchant_job_setup_task.cancel()
+            try:
+                await self._merchant_job_setup_task
+            except asyncio.CancelledError:
+                pass
+        cron_mgr = getattr(self.context, "cron_manager", None)
+        if cron_mgr and self._merchant_cron_job_id:
+            try:
+                await cron_mgr.delete_job(self._merchant_cron_job_id)
+            except Exception:
+                pass
         if self._auto_refresh_task and not self._auto_refresh_task.done():
             self._auto_refresh_task.cancel()
             try:
@@ -221,7 +250,7 @@ class RocomPlugin(Star):
                 yield event.plain_result("⚠️ 此指令仅限 bot 管理员使用。")
                 return
 
-        yield event.plain_result("💡 提示：插件已配置自动刷新凭证功能（默认每天 00:00 和 12:00），本指令仅作调试或强制兜底使用。\n\n正在刷新所有用户的凭证...")
+        yield event.plain_result("⚠️ 非必要不要手动刷新凭证，服务端会自动刷新。本指令仅用于调试或强制兜底。\n\n正在刷新所有用户的凭证...")
 
         all_users_data = await self.user_mgr.get_all_users_bindings()
         
@@ -298,6 +327,381 @@ class RocomPlugin(Star):
                 logger.info(f"[自动刷新] 通知已发送到 {session_id}")
         except Exception as e:
             logger.error(f"[自动刷新] 发送群消息失败：{e}")
+
+    async def _register_merchant_subscription_job(self):
+        cron_mgr = getattr(self.context, "cron_manager", None)
+        if not cron_mgr:
+            logger.warning("[Rocom] cron_manager unavailable, merchant push disabled")
+            return
+        try:
+            job = await cron_mgr.add_basic_job(
+                name="rocom_merchant_subscription",
+                cron_expression=self.merchant_check_cron,
+                handler=self._check_merchant_subscriptions,
+                persistent=False,
+            )
+            self._merchant_cron_job_id = job.job_id
+        except Exception as e:
+            logger.error(f"[Rocom] failed to register merchant cron job: {e}")
+
+    def _cn_tz(self):
+        return timezone(timedelta(hours=8))
+
+    def _current_merchant_round(self, now: datetime | None = None):
+        now = now or datetime.now(self._cn_tz())
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=self._cn_tz())
+        start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        round_index = None
+        round_start = None
+        round_end = None
+        if start <= now < start + timedelta(hours=16):
+            delta_seconds = int((now - start).total_seconds())
+            round_index = delta_seconds // int(timedelta(hours=4).total_seconds()) + 1
+            round_start = start + timedelta(hours=4 * (round_index - 1))
+            round_end = round_start + timedelta(hours=4)
+        return {
+            "date": now.strftime("%Y-%m-%d"),
+            "current": round_index,
+            "total": 4,
+            "round_id": f"{now.strftime('%Y-%m-%d')}-{round_index}" if round_index else f"{now.strftime('%Y-%m-%d')}-closed",
+            "is_open": round_index is not None,
+            "countdown": self._format_countdown(round_end - now) if round_end else "未开市",
+            "start_time": round_start,
+            "end_time": round_end,
+        }
+
+    def _format_countdown(self, delta: timedelta | None):
+        if not delta:
+            return "--"
+        total = max(0, int(delta.total_seconds()))
+        hours, remainder = divmod(total, 3600)
+        minutes, _ = divmod(remainder, 60)
+        if hours > 0 and minutes > 0:
+            return f"{hours}小时{minutes}分钟"
+        if hours > 0:
+            return f"{hours}小时"
+        return f"{minutes}分钟"
+
+    def _format_merchant_time(self, timestamp_ms: Any) -> str:
+        try:
+            dt = datetime.fromtimestamp(int(timestamp_ms) / 1000, tz=self._cn_tz())
+            return dt.strftime("%m-%d %H:%M")
+        except (TypeError, ValueError, OSError):
+            return "--"
+
+    def _format_merchant_window(self, item: Dict[str, Any]) -> str:
+        start_time = item.get("start_time")
+        end_time = item.get("end_time")
+        if start_time is None or end_time is None:
+            return "褰撳墠杞"
+        start_label = self._format_merchant_time(start_time)
+        end_label = self._format_merchant_time(end_time)
+        if start_label == "--" or end_label == "--":
+            return "褰撳墠杞"
+        if start_label[:5] == end_label[:5]:
+            return f"{start_label} - {end_label[6:]}"
+        return f"{start_label} - {end_label}"
+
+    async def _is_group_admin(self, event: AstrMessageEvent) -> bool:
+        if event.is_private_chat():
+            return False
+        if getattr(event, "role", "") == "admin":
+            return True
+        try:
+            group = await event.get_group()
+            if group and str(event.get_sender_id()) in [str(x) for x in getattr(group, "group_admins", [])]:
+                return True
+        except Exception:
+            pass
+        return False
+
+
+    def _merchant_products_from_response(self, res: Dict[str, Any] | None):
+        payload = res or {}
+        activities = payload.get("merchantActivities")
+        if activities is None:
+            activities = payload.get("merchant_activities")
+        activities = activities or []
+        activity = activities[0] if activities else {}
+        props = activity.get("get_props") or []
+        pets = activity.get("get_pets") or []
+        products = []
+        fallback_icon = "{{_res_path}}img/logo.cVSpb3sL.png"
+        now_ms = int(datetime.now(self._cn_tz()).timestamp() * 1000)
+
+        def is_active(item: Dict[str, Any]) -> bool:
+            start_time = item.get("start_time")
+            end_time = item.get("end_time")
+            if start_time is None or end_time is None:
+                return True
+            try:
+                return int(start_time) <= now_ms < int(end_time)
+            except (TypeError, ValueError):
+                return True
+
+        for item in props:
+            if not is_active(item):
+                continue
+            products.append(
+                {
+                    "name": item.get("name", "未知商品"),
+                    "image": item.get("icon_url") or fallback_icon,
+                    "time_label": self._format_merchant_window(item),
+                }
+            )
+        for item in pets:
+            if not is_active(item):
+                continue
+            products.append(
+                {
+                    "name": item.get("name", "未知精灵"),
+                    "image": item.get("icon_url") or fallback_icon,
+                    "time_label": self._format_merchant_window(item),
+                }
+            )
+        return activity, products
+
+
+    async def _render_merchant_image(self, refresh: bool = False):
+        res = await self.client.get_merchant_info(refresh=refresh)
+        activity, products = self._merchant_products_from_response(res)
+        round_info = self._current_merchant_round()
+        data = {
+            "background": "{{_res_path}}img/bg.C8CUoi7I.jpg",
+            "titleIcon": True,
+            "title": activity.get("name", "远行商人"),
+            "subtitle": activity.get("start_date", "每日 08:00 / 12:00 / 16:00 / 20:00 刷新"),
+            "product_count": len(products),
+            "round_info": round_info,
+            "products": products,
+        }
+        img_url = await self.renderer.render_html("render/yuanxing-shangren/index.html", data)
+        return img_url, res, products, round_info
+
+    async def _check_merchant_subscriptions(self):
+        all_subs = await self.merchant_sub_mgr.get_all_subscriptions()
+        if not all_subs:
+            return
+        img_url, _, products, round_info = await self._render_merchant_image(refresh=True)
+        if not round_info["is_open"]:
+            return
+        product_names = {p.get("name", "") for p in products}
+        for key, sub in all_subs.items():
+            items = sub.get("items") or self.merchant_subscription_items
+            matched = [name for name in items if name in product_names]
+            if not matched or sub.get("last_push_round") == round_info["round_id"]:
+                continue
+            chain = MessageChain()
+            if sub.get("mention_all"):
+                chain.at_all()
+            chain.message(
+                f"远行商人本轮命中订阅商品：{'、'.join(matched)}\n轮次：第{round_info['current']}轮\n剩余：{round_info['countdown']}"
+            )
+            if img_url:
+                chain.file_image(img_url)
+            try:
+                await self.context.send_message(sub["umo"], chain)
+            except Exception:
+                fallback = MessageChain().message(
+                    f"远行商人本轮命中订阅商品：{'、'.join(matched)}"
+                )
+                await self.context.send_message(sub["umo"], fallback)
+            sub["last_push_round"] = round_info["round_id"]
+            sub["last_matched_items"] = matched
+            await self.merchant_sub_mgr.upsert_subscription(key, sub)
+
+    def _wiki_asset_id(self, number: Any) -> int | None:
+        try:
+            numeric_id = int(number)
+        except (TypeError, ValueError):
+            return None
+        return numeric_id if numeric_id >= 3000 else numeric_id + 3000
+
+    def _wiki_pet_icon(self, item: Dict[str, Any]) -> str:
+        icon_url = item.get("icon_url") or item.get("pet_icon") or item.get("petIcon")
+        if icon_url:
+            return icon_url
+        asset_id = self._wiki_asset_id(item.get("no") or item.get("pet_id"))
+        if asset_id is None:
+            return "{{_res_path}}img/roco_icon.png"
+        return f"https://game.gtimg.cn/images/rocom/rocodata/jingling/{asset_id}/icon.png"
+
+    def _wiki_pet_image(self, item: Dict[str, Any]) -> str:
+        image_url = item.get("image_url") or item.get("pet_image") or item.get("petImage")
+        if image_url:
+            return image_url
+        asset_id = self._wiki_asset_id(item.get("no") or item.get("pet_id"))
+        if asset_id is None:
+            return "{{_res_path}}img/roco_icon.png"
+        return f"https://game.gtimg.cn/images/rocom/rocodata/jingling/{asset_id}/image.png"
+
+    def _normalize_wiki_type_values(self, values: Any) -> List[str]:
+        normalized = []
+        for value in values or []:
+            if isinstance(value, dict):
+                text = value.get("name") or value.get("label") or value.get("value")
+            else:
+                text = value
+            if text:
+                normalized.append(str(text))
+        return normalized
+
+    def _build_wiki_evolution_data(self, item: Dict[str, Any]) -> List[Dict[str, Any]]:
+        raw_chain = (
+            item.get("evolution_chain")
+            or item.get("evolutionChain")
+            or item.get("evolutions")
+            or item.get("evolution")
+            or []
+        )
+        chain = []
+        for evo in raw_chain:
+            evo_name = evo.get("name") or evo.get("pet_name") or "未知形态"
+            evo_number = evo.get("no") or evo.get("pet_id") or item.get("no")
+            evo_asset_id = self._wiki_asset_id(evo_number)
+            evo_image = (
+                evo.get("image")
+                or evo.get("image_url")
+                or evo.get("petImage")
+                or (
+                    f"https://game.gtimg.cn/images/rocom/rocodata/jingling/{evo_asset_id}/image.png"
+                    if evo_asset_id is not None
+                    else self._wiki_pet_image(item)
+                )
+            )
+            evo_icon = (
+                evo.get("icon")
+                or evo.get("icon_url")
+                or evo.get("petIcon")
+                or (
+                    f"https://game.gtimg.cn/images/rocom/rocodata/jingling/{evo_asset_id}/icon.png"
+                    if evo_asset_id is not None
+                    else self._wiki_pet_icon(item)
+                )
+            )
+            chain.append(
+                {
+                    "name": evo_name,
+                    "number": evo_number or "?",
+                    "image": evo_image,
+                    "icon": evo_icon,
+                    "condition": evo.get("condition") or evo.get("how") or evo.get("requirement") or "",
+                    "is_current": bool(
+                        evo.get("is_current")
+                        or evo_name == item.get("name")
+                        or evo_number == item.get("no")
+                    ),
+                }
+            )
+        if chain:
+            return chain
+        return [
+            {
+                "name": item.get("name", "未知精灵"),
+                "number": item.get("no", "?"),
+                "image": self._wiki_pet_image(item),
+                "icon": self._wiki_pet_icon(item),
+                "condition": "",
+                "is_current": True,
+            }
+        ]
+
+    def _build_wiki_render_data(self, item: Dict[str, Any], query: str):
+        stats = item.get("stats") or {}
+        stat_defs = [
+            ("HP", "hp", "#4bc074"),
+            ("攻击", "atk", "#e95f5f"),
+            ("魔攻", "sp_atk", "#6f85ff"),
+            ("防御", "def", "#da9c37"),
+            ("魔抗", "sp_def", "#18a1a1"),
+            ("速度", "spd", "#9b61ff"),
+        ]
+        pet_stats = [
+            {"label": label, "value": int(stats.get(key, 0) or 0), "color": color}
+            for label, key, color in stat_defs
+        ]
+        ability_name = item.get("ability_name") or item.get("ability") or "暂无"
+        ability_desc = item.get("ability_desc") or item.get("ability_description") or "暂无特性描述"
+        pet_types = [{"name": attr} for attr in self._normalize_wiki_type_values(item.get("attributes") or item.get("types"))]
+        sprite_skills = []
+        skills = item.get("skills") or item.get("skill_list") or []
+        for skill in skills[:24]:
+            sprite_skills.append(
+                {
+                    "name": skill.get("name", "未知技能"),
+                    "type": skill.get("attribute", "未知"),
+                    "category": skill.get("category", "未知"),
+                    "power": skill.get("power", "?"),
+                    "pp": skill.get("cost", "?"),
+                    "effect": skill.get("description", "暂无描述"),
+                    "level": skill.get("level", "-"),
+                }
+            )
+        matchup = item.get("type_matchup") or {}
+        traits = [
+            {"name": ability_name, "type": "特性", "effect": ability_desc, "type_class": "ability"}
+        ]
+        matchup_defs = [
+            ("克制", "strong_against"),
+            ("被克制", "weak_to"),
+            ("抗性", "resists"),
+            ("被抗", "resisted_by"),
+        ]
+        for label, key in matchup_defs:
+            values = self._normalize_wiki_type_values(matchup.get(key))
+            traits.append(
+                {
+                    "name": label,
+                    "type": "属性",
+                    "effect": "、".join(values) if values else "暂无",
+                    "type_class": "matchup",
+                }
+            )
+        description = (
+            item.get("description")
+            or item.get("summary")
+            or item.get("intro")
+            or item.get("profile")
+            or ability_desc
+            or "暂无图鉴描述"
+        )
+        return {
+            "name": item.get("name", query),
+            "number": item.get("no", "???"),
+            "query": query,
+            "form": item.get("form", ""),
+            "pet_types": pet_types,
+            "pet_icon": self._wiki_pet_icon(item),
+            "main_image": self._wiki_pet_image(item),
+            "total_stats": int(stats.get("total", 0) or sum(x["value"] for x in pet_stats)),
+            "pet_stats": pet_stats,
+            "description": description,
+            "pet_traits": traits,
+            "pet_evolution": self._build_wiki_evolution_data(item),
+            "sprite_skills": sprite_skills,
+            "updated_at": item.get("updated_at", ""),
+            "wiki_url": item.get("url", ""),
+            "commandHint": "💡 /洛克wiki <精灵名> | /洛克技能 <技能名>",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
+
+
+    def _build_skill_render_data(self, item: Dict[str, Any], query: str):
+        power = item.get("power")
+        cost = item.get("cost")
+        return {
+            "name": item.get("name", query),
+            "query": query,
+            "attribute": item.get("attribute", "unknown"),
+            "category": item.get("category", "unknown"),
+            "cost": cost if cost not in (None, "") else "?",
+            "power": power if power not in (None, "") else "?",
+            "description": item.get("description", "No description"),
+            "updated_at": item.get("updated_at", ""),
+            "commandHint": "/洛克技能 <技能名>",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
 
     @filter.command("洛克")
     async def rocom_help(self, event: AstrMessageEvent):
@@ -601,6 +1005,8 @@ class RocomPlugin(Star):
             yield event.plain_result("绑定 ID 无效，请重新绑定账号。")
             return
 
+        yield event.plain_result("⚠️ 非必要不要手动刷新凭证，服务端会自动刷新。仅在凭证异常且你确认需要兜底时再使用此指令。")
+
         res = await self.client.refresh_binding(binding_id, user_id)
         if res and res.get("framework_token"):
             new_token = res["framework_token"]
@@ -611,9 +1017,9 @@ class RocomPlugin(Star):
                     bindings[i] = binding
                     break
             await self.user_mgr.save_user_bindings(user_id, bindings)
-            yield event.plain_result("当前账号凭证刷新成功。")
+            yield event.plain_result("当前账号凭证刷新成功。非必要情况下仍建议直接重绑，不要频繁手动刷新。")
         else:
-            yield event.plain_result("凭证刷新失败，可能已过期或不支持刷新（仅 QQ 扫码支持）。")
+            yield event.plain_result("凭证刷新失败，可能已过期或不支持刷新（仅 QQ 扫码支持）。非必要不要手动刷新，服务端会自动刷新。")
 
     @filter.command("洛克删除无效绑定")
     async def rocom_cleanup_bindings(self, event: AstrMessageEvent):
@@ -1011,35 +1417,113 @@ class RocomPlugin(Star):
             yield event.image_result(img_url)
         else:
             yield event.plain_result("背包图生成失败。")
-    @filter.command("洛克图鉴", alias={"图鉴"})
+    @filter.command("洛克wiki")
     async def rocom_wiki(self, event: AstrMessageEvent, name: str = "焰火"):
-        """查询精灵图鉴"""
-        data = {
-            "name": name,
-            "number": "???",
-            "pet_types": [],
-            "main_image": f"{{{{_res_path}}}}img/roco_icon.png",
-            "variants": {
-                "elf": f"{{{{_res_path}}}}img/roco_icon.png",
-                "shiny": f"{{{{_res_path}}}}img/roco_icon.png",
-                "fruit": f"{{{{_res_path}}}}img/roco_icon.png",
-                "egg": f"{{{{_res_path}}}}img/roco_icon.png"
-            },
-            "total_stats": 0,
-            "pet_stats": [],
-            "description": "此处为精灵介绍预览。",
-            "pet_traits": [],
-            "pet_evolution": [],
-            "sprite_skills": [],
-            "commandHint": "💡 /洛克图鉴 <宠物名> 查询其他精灵",
-            "copyright": "AstrBot & WeGame Locke Kingdom Plugin"
-        }
-        
+        """查询精灵 wiki"""
+        res = await self.client.search_wiki_pet(name, limit=10)
+        results = (res or {}).get("results") or []
+        if not results:
+            yield event.plain_result(f"未找到与“{name}”相关的精灵 wiki。")
+            return
+        if len(results) > 1:
+            names = "、".join(
+                [f"{item.get('name', '')}{item.get('form', '')}".strip() for item in results[:8]]
+            )
+            yield event.plain_result(f"找到多个结果：{names}\n请使用更精确的名称重新查询。")
+            return
+
+        data = self._build_wiki_render_data(results[0], name)
         img_url = await self.renderer.render_html("render/pet-wiki/index.html", data)
         if img_url:
             yield event.image_result(img_url)
         else:
-            yield event.plain_result("图鉴生成失败。")
+            yield event.plain_result(
+                f"{data['name']} | NO.{data['number']}\n特性：{results[0].get('ability_name', '暂无')}\n链接：{results[0].get('url', '')}"
+            )
+
+    @filter.command("洛克技能", alias={"技能 wiki"})
+    async def rocom_skill(self, event: AstrMessageEvent, name: str = "圣光斩"):
+        """查询技能 wiki"""
+        res = await self.client.search_wiki_skill(name, limit=10)
+        results = (res or {}).get("results") or []
+        if not results:
+            yield event.plain_result(f'未找到与“{name}”相关的技能 wiki。')
+            return
+        if len(results) > 1:
+            names = "、".join([item.get("name", "") for item in results[:8]])
+            yield event.plain_result(
+                f"找到多个结果：{names}\n请使用更精确的技能名称重新查询。"
+            )
+            return
+
+        data = self._build_skill_render_data(results[0], name)
+        img_url = await self.renderer.render_html("render/skill-wiki/index.html", data)
+        if img_url:
+            yield event.image_result(img_url)
+        else:
+            yield event.plain_result(
+                f"{data['name']} | {data['attribute']} | {data['category']}\nPP: {data['cost']} | Power: {data['power']}\n{data['description']}"
+            )
+
+    @filter.command("远行商人")
+    async def rocom_merchant(self, event: AstrMessageEvent):
+        """查询远行商人"""
+        img_url, _, products, round_info = await self._render_merchant_image(refresh=True)
+        if img_url:
+            yield event.image_result(img_url)
+            return
+        if not products:
+            yield event.plain_result("当前远行商人暂无商品。")
+            return
+        names = "、".join([p["name"] for p in products])
+        yield event.plain_result(
+            f"远行商人当前商品：{names}\n当前轮次：{round_info['current'] or '未开放'}\n剩余：{round_info['countdown']}"
+        )
+
+    @filter.command("订阅远行商人")
+    async def subscribe_merchant(self, event: AstrMessageEvent, mention_all: str = "0"):
+        """订阅远行商人商品提醒"""
+        if event.is_private_chat():
+            yield event.plain_result("该命令仅支持群聊使用。")
+            return
+        if not await self._is_group_admin(event):
+            yield event.plain_result("仅当前群管理员可以配置远行商人订阅。")
+            return
+        mention = str(mention_all).strip() == "1"
+        group_id = str(event.get_group_id())
+        await self.merchant_sub_mgr.upsert_subscription(
+            group_id,
+            {
+                "group_id": group_id,
+                "umo": event.unified_msg_origin,
+                "mention_all": mention,
+                "items": list(self.merchant_subscription_items),
+                "last_push_round": "",
+                "last_matched_items": [],
+                "updated_by": str(event.get_sender_id()),
+            },
+        )
+        yield event.plain_result(
+            f"已订阅远行商人，监听商品：{'、'.join(self.merchant_subscription_items)}；"
+            f"命中后{'会' if mention else '不会'}@全体。\n"
+            f"订阅方式：/订阅远行商人 1 为 @全体，/订阅远行商人 0 为不@全体，"
+            f"/取消订阅远行商人 可关闭订阅。"
+        )
+
+    @filter.command("取消订阅远行商人")
+    async def unsubscribe_merchant(self, event: AstrMessageEvent):
+        """取消远行商人商品提醒"""
+        if event.is_private_chat():
+            yield event.plain_result("该命令仅支持群聊使用。")
+            return
+        if not await self._is_group_admin(event):
+            yield event.plain_result("仅当前群管理员可以取消远行商人订阅。")
+            return
+        deleted = await self.merchant_sub_mgr.delete_subscription(str(event.get_group_id()))
+        if deleted:
+            yield event.plain_result("已取消本群远行商人订阅。")
+        else:
+            yield event.plain_result("本群当前没有远行商人订阅。")
     @filter.command("洛克交换大厅", alias={"洛克大厅", "交换大厅"})
     async def rocom_exchange_hall(self, event: AstrMessageEvent, page: str = "1"):
         """查看交换大厅"""
@@ -1049,11 +1533,11 @@ class RocomPlugin(Star):
             async for res in self._not_logged_in_hint(event):
                 yield res
             return
-            
         try:
             page_no = int(page)
         except:
             page_no = 1
+        page_no = max(page_no, 1)
             
         try:
             res = await self.client.get_exchange_posters(fw_token, page_no=page_no)
@@ -1303,8 +1787,33 @@ class RocomPlugin(Star):
 
         # 身高/体重反查模式
         if height is not None or weight is not None:
-            results = self.egg_searcher.search_by_size(height=height, weight=weight)
-            yield event.plain_result(self.egg_searcher.build_size_search_text(height, weight, results))
+            use_backend_size_query = height is not None and weight is not None
+            results = None
+            data = None
+            text_result = None
+
+            if use_backend_size_query:
+                results = await self.client.query_pet_size(height / 100, weight)
+                if results is not None:
+                    data = self.egg_searcher.build_size_search_data_from_api(
+                        height, weight, results
+                    )
+                    text_result = self.egg_searcher.build_size_search_text_from_api(
+                        height, weight, results
+                    )
+
+            if data is None:
+                results = self.egg_searcher.search_by_size(height=height, weight=weight)
+                data = self.egg_searcher.build_size_search_data(height, weight, results)
+                text_result = self.egg_searcher.build_size_search_text(
+                    height, weight, results
+                )
+
+            img_url = await self.renderer.render_html("render/searcheggs/size.html", data)
+            if img_url:
+                yield event.image_result(img_url)
+            else:
+                yield event.plain_result(text_result)
             return
 
         # 名称查蛋模式
@@ -1316,7 +1825,14 @@ class RocomPlugin(Star):
         sr = self.egg_searcher.search(name)
 
         if sr.match_type == SearchResult.MULTI:
-            yield event.plain_result(self.egg_searcher.build_candidates_text(name, sr.candidates))
+            data = self.egg_searcher.build_candidates_render_data(name, sr.candidates)
+            img_url = await self.renderer.render_html("render/searcheggs/candidates.html", data)
+            if img_url:
+                yield event.image_result(img_url)
+            else:
+                yield event.plain_result(
+                    self.egg_searcher.build_candidates_text(name, sr.candidates)
+                )
             return
         if sr.match_type == SearchResult.NOT_FOUND:
             yield event.plain_result(f"❌ 未找到名为「{name}」的精灵，请检查名称后重试。")
@@ -1365,18 +1881,37 @@ class RocomPlugin(Star):
         if not name_b:
             sr = self.egg_searcher.search(name_a)
             if sr.match_type == SearchResult.MULTI:
-                yield event.plain_result(self.egg_searcher.build_candidates_text(name_a, sr.candidates))
+                data = self.egg_searcher.build_candidates_render_data(name_a, sr.candidates)
+                img_url = await self.renderer.render_html("render/searcheggs/candidates.html", data)
+                if img_url:
+                    yield event.image_result(img_url)
+                else:
+                    yield event.plain_result(
+                        self.egg_searcher.build_candidates_text(name_a, sr.candidates)
+                    )
                 return
             if sr.match_type == SearchResult.NOT_FOUND:
                 yield event.plain_result(f"❌ 未找到名为「{name_a}」的精灵。")
                 return
-            yield event.plain_result(self.egg_searcher.build_want_pet_text(sr.pet))
+            data = self.egg_searcher.build_want_pet_data(sr.pet)
+            img_url = await self.renderer.render_html("render/searcheggs/want.html", data)
+            if img_url:
+                yield event.image_result(img_url)
+            else:
+                yield event.plain_result(self.egg_searcher.build_want_pet_text(sr.pet))
             return
 
         # 双参数模式：父体 + 母体配种判定
         sr_a = self.egg_searcher.search(name_a)
         if sr_a.match_type == SearchResult.MULTI:
-            yield event.plain_result(self.egg_searcher.build_candidates_text(name_a, sr_a.candidates))
+            data = self.egg_searcher.build_candidates_render_data(name_a, sr_a.candidates)
+            img_url = await self.renderer.render_html("render/searcheggs/candidates.html", data)
+            if img_url:
+                yield event.image_result(img_url)
+            else:
+                yield event.plain_result(
+                    self.egg_searcher.build_candidates_text(name_a, sr_a.candidates)
+                )
             return
         if sr_a.match_type == SearchResult.NOT_FOUND:
             yield event.plain_result(f"❌ 未找到名为「{name_a}」的精灵。")
@@ -1384,7 +1919,14 @@ class RocomPlugin(Star):
 
         sr_b = self.egg_searcher.search(name_b)
         if sr_b.match_type == SearchResult.MULTI:
-            yield event.plain_result(self.egg_searcher.build_candidates_text(name_b, sr_b.candidates))
+            data = self.egg_searcher.build_candidates_render_data(name_b, sr_b.candidates)
+            img_url = await self.renderer.render_html("render/searcheggs/candidates.html", data)
+            if img_url:
+                yield event.image_result(img_url)
+            else:
+                yield event.plain_result(
+                    self.egg_searcher.build_candidates_text(name_b, sr_b.candidates)
+                )
             return
         if sr_b.match_type == SearchResult.NOT_FOUND:
             yield event.plain_result(f"❌ 未找到名为「{name_b}」的精灵。")

@@ -1,429 +1,382 @@
 @font-face {
-    font-family: 'fzlant';
-    src: url('../../ttf/fzlant.ttf');
+  font-family: "fzlant";
+  src: url("{{_res_path}}ttf/fzlant.D5FI9Et0.ttf");
 }
 
 @font-face {
-    font-family: 'dundun';
-    src: url('../../ttf/dundun.ttf');
+  font-family: "dundun";
+  src: url("{{_res_path}}ttf/dundun.xHd_Ee5-.woff2");
 }
 
 :root {
-    --brand-yellow: #ffba00;
-    --brand-blue: #0084ff;
-    --text-primary: #333;
-    --text-secondary: #666;
-    --bg-glass: rgba(255, 255, 255, 0.85);
-    --border-color: rgba(0, 0, 0, 0.08);
+  --ink: #2c2318;
+  --muted: #7e6a58;
+  --line: rgba(118, 94, 67, 0.16);
+  --paper: rgba(255, 252, 246, 0.96);
+  --paper-strong: rgba(255, 255, 255, 0.98);
+  --accent: #2f6fda;
+  --accent-2: #f1b33f;
 }
 
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+  box-sizing: border-box;
 }
 
-body.wiki-body {
-    background-image: url('https://wiki.biligame.com/rocom/special/hp.php?f=bg.png'); /* 站位，实际渲染会用背景 */
-    background-color: #f0f2f5;
-    font-family: 'fzlant', sans-serif;
-    color: var(--text-primary);
-    padding: 20px;
-    display: flex;
-    justify-content: center;
+body.bwiki-body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(255, 222, 158, 0.32), transparent 30%),
+    linear-gradient(180deg, #f8f2e8 0%, #ece4d6 100%);
+  color: var(--ink);
+  font-family: "fzlant", "Microsoft YaHei", sans-serif;
 }
 
-.wiki-container {
-    width: 1200px;
-    background: var(--bg-glass);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    padding: 30px;
-    border: 1px solid rgba(255,255,255,0.3);
+.bwiki-shell {
+  width: 920px;
+  margin: 0 auto;
+  padding: 20px 16px 24px;
 }
 
-/* Header */
-.wiki-header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 25px;
-    border-bottom: 2px solid var(--brand-yellow);
-    padding-bottom: 15px;
+.hero-card,
+.panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  box-shadow: 0 14px 32px rgba(72, 52, 28, 0.07);
 }
 
-.pet-number {
-    font-family: 'dundun';
-    font-size: 28px;
-    color: var(--text-secondary);
+.hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 16px;
+  padding: 20px;
 }
 
-.pet-name {
-    font-family: 'dundun';
-    font-size: 36px;
-    color: var(--text-primary);
+.hero-kicker,
+.panel-title,
+.hero-no,
+.skill-level {
+  font-family: "dundun", "fzlant", sans-serif;
 }
 
-.pet-types {
-    display: flex;
-    gap: 10px;
-    margin-left: auto;
+.hero-kicker {
+  color: var(--accent);
+  font-size: 16px;
+  letter-spacing: 1px;
 }
 
-.type-tag {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    background: rgba(0,0,0,0.05);
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 14px;
+.hero-title-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 10px;
 }
 
-.type-tag img {
-    width: 18px;
-    height: 18px;
+.hero-icon-wrap {
+  width: 92px;
+  height: 92px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,240,230,0.96));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-/* Main Row */
-.wiki-main-row {
-    display: flex;
-    gap: 30px;
-    margin-bottom: 30px;
+.hero-icon-wrap img {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
 }
 
-.wiki-illustration-side {
-    flex: 0 0 400px;
+.hero-no {
+  font-size: 24px;
+  color: #8a6a4b;
 }
 
-.main-illustration {
-    width: 400px;
-    height: 400px;
-    background: rgba(255,255,255,0.5);
-    border-radius: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 20px;
-    border: 1px solid var(--border-color);
+.hero-name {
+  margin: 4px 0 0;
+  font-size: 42px;
+  line-height: 1.05;
+  word-break: break-word;
 }
 
-.main-illustration img {
-    max-width: 90%;
-    max-height: 90%;
-    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.15));
+.hero-form {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(47, 111, 218, 0.12);
+  color: var(--accent);
+  font-size: 16px;
 }
 
-.variant-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+.hero-type-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
 }
 
-.variant-item {
-    background: white;
-    padding: 10px;
-    border-radius: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    border: 1px solid var(--border-color);
+.type-pill {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(42, 34, 24, 0.06);
+  border: 1px solid rgba(42, 34, 24, 0.08);
+  font-size: 17px;
 }
 
-.variant-item img {
-    width: 60px;
-    height: 60px;
-    object-fit: contain;
+.hero-desc {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-.variant-item span {
-    font-size: 12px;
-    color: var(--text-secondary);
+.hero-visual {
+  min-height: 240px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: radial-gradient(circle at center, rgba(255,255,255,0.98), rgba(244,236,224,0.92));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
 }
 
-/* Info Side */
-.wiki-info-side {
-    flex: 1;
+.hero-visual img {
+  width: 100%;
+  max-width: 210px;
+  max-height: 210px;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 22px rgba(44, 35, 24, 0.16));
 }
 
-.info-table {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+.wiki-grid {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
 }
 
-.stats-row {
-    background: white;
-    border-radius: 15px;
-    padding: 20px;
-    border: 1px solid var(--border-color);
+.panel {
+  padding: 18px 20px;
+}
+
+.evo-panel,
+.skills-panel {
+  grid-column: 1 / -1;
+}
+
+.panel-title {
+  margin-bottom: 14px;
+  font-size: 25px;
 }
 
 .stats-total {
-    margin-bottom: 15px;
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
+  margin-bottom: 16px;
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--accent);
 }
 
-.stats-total .label { font-size: 14px; color: var(--text-secondary); }
-.stats-total .value { font-size: 24px; font-weight: bold; color: var(--brand-blue); }
-
-.stats-chart {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+.stats-bars,
+.trait-list {
+  display: grid;
+  gap: 10px;
 }
 
-.stat-bar-box {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.stat-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 42px;
+  gap: 10px;
+  align-items: center;
 }
 
-.stat-label {
-    width: 40px;
-    font-size: 13px;
-    color: var(--text-secondary);
-}
-
-.stat-bar-bg {
-    flex: 1;
-    height: 8px;
-    background: #f0f0f0;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.stat-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-}
-
+.stat-label,
 .stat-value {
-    width: 30px;
-    text-align: right;
-    font-size: 13px;
-    font-weight: bold;
+  font-size: 17px;
 }
 
-.description-row {
-    padding: 15px;
-    border-top: 1px dashed var(--border-color);
+.stat-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(42, 34, 24, 0.08);
+  overflow: hidden;
 }
 
-.description-row .info-label {
-    font-size: 14px;
-    color: var(--brand-yellow);
-    margin-bottom: 5px;
-    font-weight: bold;
+.stat-fill {
+  height: 100%;
+  border-radius: 999px;
 }
 
-.description-row .info-content {
-    font-size: 13px;
-    line-height: 1.6;
-    color: var(--text-secondary);
+.trait-card,
+.skill-card,
+.evo-card {
+  background: var(--paper-strong);
+  border: 1px solid rgba(42, 34, 24, 0.06);
+  border-radius: 20px;
 }
 
-/* Trait Section (The requested vertical label style) */
-.trait-section {
-    display: flex;
-    background: #2d2d2d;
-    border-radius: 12px;
-    overflow: hidden;
-    margin-bottom: 30px;
-    color: white;
+.trait-card {
+  padding: 16px 18px;
 }
 
-.trait-vertical-label {
-    width: 40px;
-    background: #1a1a1a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    writing-mode: vertical-rl;
-    font-family: 'dundun';
-    font-size: 18px;
-    color: var(--brand-yellow);
-    letter-spacing: 5px;
-    text-transform: uppercase;
-}
-
-.trait-content-list {
-    flex: 1;
-    padding: 15px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.trait-item {
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    padding-bottom: 10px;
-}
-
-.trait-item:last-child { border: none; }
-
-.trait-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 5px;
+.trait-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
 }
 
 .trait-name {
-    font-size: 16px;
-    font-weight: bold;
-    color: var(--brand-yellow);
+  font-size: 20px;
+  font-weight: 700;
 }
 
-.trait-tag {
-    font-size: 11px;
-    background: var(--brand-blue);
-    padding: 1px 6px;
-    border-radius: 4px;
+.trait-type {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(241, 179, 63, 0.18);
+  color: #8b5f00;
+  font-size: 15px;
 }
 
 .trait-effect {
-    font-size: 13px;
-    color: #ccc;
-    line-height: 1.4;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-/* Evolution */
-.evolution-section {
-    margin-bottom: 30px;
+.evo-track {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
-.section-title {
-    font-family: 'dundun';
-    font-size: 18px;
-    margin-bottom: 15px;
-    color: var(--text-primary);
-    border-left: 4px solid var(--brand-yellow);
-    padding-left: 10px;
+.evo-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.evolution-track {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    background: white;
-    padding: 20px;
-    border-radius: 15px;
-    border: 1px solid var(--border-color);
+.evo-card {
+  width: 160px;
+  padding: 14px;
 }
 
-.evo-stage {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    opacity: 0.6;
+.evo-card.current {
+  border-color: rgba(47, 111, 218, 0.35);
+  box-shadow: 0 10px 24px rgba(47, 111, 218, 0.12);
 }
 
-.evo-stage.current { opacity: 1; transform: scale(1.1); }
+.evo-image {
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-.evo-img img { width: 80px; height: 80px; }
-.evo-name { font-size: 13px; font-weight: bold; }
-.evo-arrow { color: #ccc; font-size: 20px; }
+.evo-image img {
+  width: 82px;
+  height: 82px;
+  object-fit: contain;
+}
 
-/* Skills Grid (2-column layout) */
-.skills-block {
-    margin-bottom: 30px;
+.evo-no {
+  margin-top: 6px;
+  color: #8a6a4b;
+  font-size: 14px;
+}
+
+.evo-name {
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.evo-condition {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.evo-arrow {
+  color: #8a6a4b;
+  font-size: 28px;
 }
 
 .skills-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.skill-card-wiki {
-    background: white;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-    overflow: hidden;
-    transition: transform 0.2s;
+.skill-card {
+  padding: 14px 16px;
 }
 
-.skill-card-top {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #eee;
+.skill-top {
+  display: flex;
+  gap: 12px;
 }
 
-.skill-lv {
-    font-size: 11px;
-    color: white;
-    background: var(--text-secondary);
-    padding: 1px 4px;
-    border-radius: 3px;
+.skill-level {
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), #76a0f3);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
 }
 
-.skill-meta {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+.skill-main {
+  min-width: 0;
 }
 
-.skill-name { font-size: 14px; font-weight: bold; color: var(--text-primary); }
-.skill-power { font-size: 11px; color: var(--text-secondary); }
-
-.skill-type-icon {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 2px 8px;
-    border-radius: 6px;
-    color: white;
-    min-width: 45px;
+.skill-name {
+  font-size: 20px;
+  font-weight: 700;
+  word-break: break-word;
 }
 
-.skill-type-text { font-size: 11px; font-weight: bold; }
-.skill-energy { font-size: 10px; opacity: 0.9; }
-
-.skill-card-body {
-    padding: 10px 12px;
+.skill-sub {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+  word-break: break-word;
 }
 
-.skill-card-body p {
-    font-size: 12px;
-    color: var(--text-secondary);
-    line-height: 1.4;
+.skill-body {
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 1.75;
+  color: #4d4032;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-/* Specific skill styles */
-.skill-card-wiki.bloodline .skill-lv { background: #ff5e5e; }
-.skill-card-wiki.stone .skill-lv { background: #be5eff; }
-
-/* Standardized Pagination Footer */
-.pagination-footer {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    margin-top: 20px;
-    padding: 15px 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    gap: 8px;
-    width: 100%;
-}
-.pagination-text {
-    font-size: 16px;
-    color: #f4eee1;
-}
-.pagination-hint {
-    color: #ffc966;
-    font-size: 16px;
-    font-weight: bold;
-}
-.copyright {
-    color: rgba(255, 255, 255, 0.3);
-    font-size: 12px;
+.wiki-footer {
+  margin-top: 18px;
+  padding: 14px 6px 0;
+  border-top: 1px solid rgba(113, 96, 78, 0.16);
+  display: grid;
+  gap: 6px;
+  color: #7a6757;
+  font-size: 15px;
+  word-break: break-word;
 }

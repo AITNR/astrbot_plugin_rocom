@@ -19,9 +19,14 @@
       <!-- Pet Info Card -->
       <div class="pet-card">
         <div class="pet-card-header">
-          <div>
-            <span class="pet-name">{{pet_name}}</span>
-            <span class="pet-id">#{{pet_id}}</span>
+          <div class="pet-card-main">
+            <div class="pet-icon-wrap">
+              <img class="pet-icon" src="{{pet_icon}}" alt="{{pet_name}}" onerror="this.onerror=null;this.src='{{_res_path}}img/roco_icon.png'">
+            </div>
+            <div>
+              <span class="pet-name">{{pet_name}}</span>
+              <span class="pet-id">#{{pet_id}}</span>
+            </div>
           </div>
           <span class="pet-type-badge">{{type_label}}</span>
         </div>

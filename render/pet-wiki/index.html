@@ -1,197 +1,118 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <title>洛克王国图鉴 - {{name}}</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>洛克 Wiki - {{name}}</title>
+  <link rel="stylesheet" href="{{_res_path}}render/pet-wiki/style.css">
 </head>
-<body class="wiki-body">
-    <div class="wiki-container">
-        <!-- 头部：编号与名称 -->
-        <header class="wiki-header">
-            <span class="pet-number">NO.{{number}}</span>
-            <span class="pet-name">{{name}}</span>
-            <div class="pet-types">
-                {{each pet_types}}
-                <div class="type-tag">
-                    <img src="{{$value.icon}}" alt="{{$value.name}}">
-                    <span>{{$value.name}}</span>
-                </div>
-                {{/each}}
-            </div>
-        </header>
-
-        <div class="wiki-main-row">
-            <!-- 左侧：立绘与多形态展示 -->
-            <div class="wiki-illustration-side">
-                <div class="main-illustration">
-                    <img src="{{main_image}}" alt="{{name}}">
-                </div>
-                <div class="variant-grid">
-                    <div class="variant-item">
-                        <img src="{{variants.elf}}" alt="普通形态">
-                        <span>精灵</span>
-                    </div>
-                    <div class="variant-item">
-                        <img src="{{variants.shiny}}" alt="异色形态">
-                        <span>异色</span>
-                    </div>
-                    <div class="variant-item">
-                        <img src="{{variants.fruit}}" alt="果实形态">
-                        <span>果实</span>
-                    </div>
-                    <div class="variant-item">
-                        <img src="{{variants.egg}}" alt="精灵蛋">
-                        <span>蛋</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 右侧：属性详情与种族值 -->
-            <div class="wiki-info-side">
-                <div class="info-table">
-                    <div class="info-row stats-row">
-                        <div class="stats-total">
-                            <span class="label">种族值</span>
-                            <span class="value">{{total_stats}}</span>
-                        </div>
-                        <div class="stats-chart">
-                            {{each pet_stats}}
-                            <div class="stat-bar-box">
-                                <span class="stat-label">{{$value.label}}</span>
-                                <div class="stat-bar-bg">
-                                    <div class="stat-bar-fill" style="width:{{$value.value / 1.5}}%; background:{{$value.color}};"></div>
-                                </div>
-                                <span class="stat-value">{{$value.value}}</span>
-                            </div>
-                            {{/each}}
-                        </div>
-                    </div>
-                    
-                    <div class="info-row description-row">
-                        <div class="info-label">精灵介绍</div>
-                        <div class="info-content">{{description}}</div>
-                    </div>
-                </div>
-            </div>
+<body class="bwiki-body">
+  <div class="bwiki-shell">
+    <header class="hero-card">
+      <div class="hero-meta">
+        <div class="hero-kicker">ROCOM BWIKI</div>
+        <div class="hero-title-row">
+          <div class="hero-icon-wrap">
+            <img src="{{pet_icon}}" alt="{{name}}" onerror="this.onerror=null;this.src='{{_res_path}}img/roco_icon.png'">
+          </div>
+          <div class="hero-title-main">
+            <div class="hero-no">No. {{number}}</div>
+            <h1 class="hero-name">{{name}}</h1>
+            {% if form %}
+            <div class="hero-form">{{form}}</div>
+            {% endif %}
+          </div>
         </div>
-
-        <!-- 特性板块 (精灵被动) -->
-        <div class="trait-section">
-            <div class="trait-vertical-label">特性</div>
-            <div class="trait-content-list">
-                {{each pet_traits}}
-                <div class="trait-item {{$value.type_class}}">
-                    <div class="trait-header">
-                        <span class="trait-name">{{$value.name}}</span>
-                        <span class="trait-tag">{{$value.type}}</span>
-                    </div>
-                    <div class="trait-effect">{{$value.effect}}</div>
-                </div>
-                {{/each}}
-            </div>
+        <div class="hero-type-row">
+          {% for item in pet_types %}
+          <span class="type-pill">{{item.name}}</span>
+          {% endfor %}
         </div>
+        <div class="hero-desc">{{description}}</div>
+      </div>
+      <div class="hero-visual">
+        <img src="{{main_image}}" alt="{{name}}" onerror="this.onerror=null;this.src='{{pet_icon}}'">
+      </div>
+    </header>
 
-        <!-- 进化链 -->
-        <div class="evolution-section">
-            <div class="section-title">进化路线</div>
-            <div class="evolution-track">
-                {{each pet_evolution}}
-                <div class="evo-stage {{if $value.is_current}}current{{/if}}">
-                    <div class="evo-img">
-                        <img src="{{$value.image}}" alt="{{$value.name}}">
-                    </div>
-                    <div class="evo-name">{{$value.name}}</div>
-                </div>
-                {{if $index < pet_evolution.length - 1}}
-                <div class="evo-arrow">➜</div>
-                {{/if}}
-                {{/each}}
+    <main class="wiki-grid">
+      <section class="panel stats-panel">
+        <div class="panel-title">种族值</div>
+        <div class="stats-total">{{total_stats}}</div>
+        <div class="stats-bars">
+          {% for item in pet_stats %}
+          <div class="stat-row">
+            <div class="stat-label">{{item.label}}</div>
+            <div class="stat-track">
+              <div class="stat-fill" style="width: {{(item.value / 160 * 100) | round(1)}}%; background: {{item.color}};"></div>
             </div>
+            <div class="stat-value">{{item.value}}</div>
+          </div>
+          {% endfor %}
         </div>
+      </section>
 
-        <!-- 技能列表：2列网格 -->
-        <div class="skills-master-container">
-            <!-- 精灵技能 -->
-            {{if sprite_skills && sprite_skills.length > 0}}
-            <div class="skills-block">
-                <div class="section-title">精灵技能</div>
-                <div class="skills-grid">
-                    {{each sprite_skills}}
-                    <div class="skill-card-wiki">
-                        <div class="skill-card-top">
-                            <div class="skill-lv">LV.{{$value.level || 1}}</div>
-                            <div class="skill-meta">
-                                <span class="skill-name">{{$value.name}}</span>
-                                <span class="skill-power">威力: {{$value.power}}</span>
-                            </div>
-                            <div class="skill-type-icon" style="background-color:{{$value.type_color || '#ccc'}}">
-                                <span class="skill-type-text">{{$value.type}}</span>
-                                <span class="skill-energy">✦{{$value.pp}}</span>
-                            </div>
-                        </div>
-                        <div class="skill-card-body">
-                            <p>✦ {{$value.effect}}</p>
-                        </div>
-                    </div>
-                    {{/each}}
-                </div>
+      <section class="panel trait-panel">
+        <div class="panel-title">特性与克制</div>
+        <div class="trait-list">
+          {% for item in pet_traits %}
+          <article class="trait-card {{item.type_class}}">
+            <div class="trait-head">
+              <span class="trait-name">{{item.name}}</span>
+              <span class="trait-type">{{item.type}}</span>
             </div>
-            {{/if}}
-
-            <!-- 血脉/契约技能 -->
-            {{if bloodline_skills && bloodline_skills.length > 0}}
-            <div class="skills-block">
-                <div class="section-title">血脉 & 契约技能</div>
-                <div class="skills-grid">
-                    {{each bloodline_skills}}
-                    <div class="skill-card-wiki bloodline">
-                        <div class="skill-card-top">
-                            <div class="skill-lv">血脉</div>
-                            <div class="skill-meta">
-                                <span class="skill-name">{{$value.name}}</span>
-                            </div>
-                        </div>
-                        <div class="skill-card-body">
-                            <p>✦ {{$value.effect}}</p>
-                        </div>
-                    </div>
-                    {{/each}}
-                </div>
-            </div>
-            {{/if}}
-
-            <!-- 技能石技能 -->
-            {{if skill_stones && skill_stones.length > 0}}
-            <div class="skills-block">
-                <div class="section-title">可学技能石</div>
-                <div class="skills-grid">
-                    {{each skill_stones}}
-                    <div class="skill-card-wiki stone">
-                        <div class="skill-card-top">
-                            <div class="skill-lv">{{$value.level || '石'}}</div>
-                            <div class="skill-meta">
-                                <span class="skill-name">{{$value.name}}</span>
-                                <span class="skill-power">威力: {{$value.power}}</span>
-                            </div>
-                            <div class="skill-type-icon" style="background-color:{{$value.type_color || '#ccc'}}">
-                                <span class="skill-type-text">{{$value.type}}</span>
-                                <span class="skill-energy">✦{{$value.pp}}</span>
-                            </div>
-                        </div>
-                        <div class="skill-card-body">
-                            <p>✦ {{$value.effect}}</p>
-                        </div>
-                    </div>
-                    {{/each}}
-                </div>
-            </div>
-            {{/if}}
+            <div class="trait-effect">{{item.effect}}</div>
+          </article>
+          {% endfor %}
         </div>
-        <div class="pagination-footer">
-            <span class="pagination-hint">{{commandHint}}</span>
-            <span class="copyright">{{copyright}}</span>
+      </section>
+
+      <section class="panel evo-panel">
+        <div class="panel-title">进化路线</div>
+        <div class="evo-track">
+          {% for item in pet_evolution %}
+          <div class="evo-item">
+            <div class="evo-card {% if item.is_current %}current{% endif %}">
+              <div class="evo-image"><img src="{{item.icon or item.image}}" alt="{{item.name}}" onerror="this.onerror=null;this.src='{{_res_path}}img/roco_icon.png'"></div>
+              <div class="evo-no">No. {{item.number}}</div>
+              <div class="evo-name">{{item.name}}</div>
+              {% if item.condition %}
+              <div class="evo-condition">{{item.condition}}</div>
+              {% endif %}
+            </div>
+            {% if not loop.last %}
+            <div class="evo-arrow">→</div>
+            {% endif %}
+          </div>
+          {% endfor %}
         </div>
-    </div>
+      </section>
+
+      <section class="panel skills-panel">
+        <div class="panel-title">技能列表</div>
+        <div class="skills-grid">
+          {% for item in sprite_skills %}
+          <article class="skill-card">
+            <div class="skill-top">
+              <div class="skill-level">{{item.level}}</div>
+              <div class="skill-main">
+                <div class="skill-name">{{item.name}}</div>
+                <div class="skill-sub">{{item.type}} | {{item.category}} | PP {{item.pp}} | 威力 {{item.power}}</div>
+              </div>
+            </div>
+            <div class="skill-body">{{item.effect}}</div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+
+    <footer class="wiki-footer">
+      <div>{{commandHint}}</div>
+      <div>更新时间：{{updated_at}}</div>
+      <div>{{wiki_url}}</div>
+      <div>{{copyright}}</div>
+    </footer>
+  </div>
 </body>
 </html>

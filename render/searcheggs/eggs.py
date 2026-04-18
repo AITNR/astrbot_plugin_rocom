@@ -420,6 +420,8 @@ class EggSearcher:
 
         return {
             "pet_name": self._name(pet), "pet_id": pet["id"],
+            "pet_icon": self._pet_icon_url(pet["id"]),
+            "pet_image": self._pet_image_url(pet["id"]),
             "type_label": self._type(pet),
             "egg_groups_label": format_egg_groups(egs),
             "egg_groups": egs,
@@ -575,3 +577,23 @@ class EggSearcher:
         if lo is not None and hi is not None:
             return f"{lo}{u}" if lo == hi else f"{lo}-{hi}{u}"
         return f"{lo or hi}{u}"
+
+    @staticmethod
+    def _asset_pet_id(pet_id) -> Optional[int]:
+        try:
+            numeric_id = int(pet_id)
+        except (TypeError, ValueError):
+            return None
+        return numeric_id if numeric_id >= 3000 else numeric_id + 3000
+
+    def _pet_icon_url(self, pet_id) -> str:
+        asset_id = self._asset_pet_id(pet_id)
+        if asset_id is None:
+            return "{{_res_path}}img/roco_icon.png"
+        return f"https://game.gtimg.cn/images/rocom/rocodata/jingling/{asset_id}/icon.png"
+
+    def _pet_image_url(self, pet_id) -> str:
+        asset_id = self._asset_pet_id(pet_id)
+        if asset_id is None:
+            return "{{_res_path}}img/roco_icon.png"
+        return f"https://game.gtimg.cn/images/rocom/rocodata/jingling/{asset_id}/image.png"
