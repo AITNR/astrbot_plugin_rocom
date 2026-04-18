@@ -15,8 +15,9 @@ from astrbot.core.message.components import Plain, Image
 from .core.client import RocomClient
 from .core.user import UserManager
 from .core.render import Renderer
+from .render.searcheggs.eggs import EggSearcher, SearchResult
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.7.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v1.8.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -42,6 +43,10 @@ class RocomPlugin(Star):
         self.auto_refresh_time = self.config.get("auto_refresh_time", ["00:00", "12:00"])
         self.auto_refresh_notify_group = self.config.get("auto_refresh_notify_group", "")
         self._auto_refresh_task = None
+        
+        # 初始化查蛋模块（数据自包含在 render/searcheggs/ 下）
+        searcheggs_dir = os.path.join(res_path, "render", "searcheggs")
+        self.egg_searcher = EggSearcher(searcheggs_dir)
         
         # 启动时检查是否需要开启自动刷新
         logger.info(f"[Rocom] 插件初始化完成，自动刷新启用状态：{self.auto_refresh_enabled}, 刷新时间：{self.auto_refresh_time}, 通知群：{self.auto_refresh_notify_group}")
@@ -101,7 +106,7 @@ class RocomPlugin(Star):
         return fw_token
 
     async def _auto_refresh_loop(self):
-        """自动刷新循环任务"""
+        """自动刷新循环任务（非必要不要使用）"""
         logger.info("[自动刷新] 任务已启动")
         
         # 记录上次刷新的时间点，避免同一分钟内重复刷新
@@ -207,7 +212,7 @@ class RocomPlugin(Star):
 
     @filter.command("洛克刷新所有凭证")
     async def rocom_refresh_all(self, event: AstrMessageEvent):
-        """刷新所有用户的凭证（需要 bot 管理员权限）"""
+        """刷新所有用户的凭证（需要 bot 管理员权限，同时非必要不要使用）"""
         # 检查 bot 管理员权限
         if not event.is_admin():
             uid = str(event.get_sender_id())
@@ -307,8 +312,8 @@ class RocomPlugin(Star):
                         {"cmd": "洛克 QQ 登录", "desc": "使用 QQ 扫码快捷登录及绑定"},
                         {"cmd": "洛克微信登录", "desc": "使用微信扫码快捷登录及绑定"},
                         {"cmd": "洛克导入 <ID> <Ticket>", "desc": "通过客户端凭证手动登录"},
-                        {"cmd": "洛克刷新", "desc": "刷新当前主账号 QQ 凭证"},
-                        {"cmd": "洛克刷新所有凭证", "desc": "刷新所有用户的凭证 (管理员，仅作调试或强制兜底)"},
+                        {"cmd": "洛克刷新", "desc": "刷新当前主账号 QQ 凭证，非必要不要使用，直接重绑"},
+                        {"cmd": "洛克刷新所有凭证", "desc": "刷新所有用户的凭证 (管理员，仅作调试或强制兜底，非必要不要使用)"},
                         {"cmd": "洛克删除无效绑定", "desc": "清理失效的绑定记录 (管理员)"}
                     ]
                 },
@@ -319,7 +324,9 @@ class RocomPlugin(Star):
                         {"cmd": "洛克战绩 <页码>", "desc": "查询并展示近期的对战场次记录"},
                         {"cmd": "洛克背包 <筛选> <页码>", "desc": "查看精灵收集 (筛选:全部/异色/了不起/炫彩，参数可交换)"},
                         {"cmd": "洛克阵容 <分类> <页码>", "desc": "查看阵容助手推荐阵容 (参数可交换)"},
-                        {"cmd": "洛克交换大厅 <页码>", "desc": "查看交换大厅海报 (支持别名：洛克大厅/交换大厅)"}
+                        {"cmd": "洛克交换大厅 <页码>", "desc": "查看交换大厅海报 (支持别名：洛克大厅/交换大厅)"},
+                        {"cmd": "洛克查蛋 <精灵名>", "desc": "查询精灵蛋组及可配种精灵 (支持别名：查蛋)"},
+                        {"cmd": "洛克配种 <精灵A> <精灵B>", "desc": "判断两只精灵能否配种 (支持别名：配种)"}
                     ]
                 },
                 {
@@ -581,7 +588,7 @@ class RocomPlugin(Star):
             
     @filter.command("洛克刷新")
     async def rocom_refresh(self, event: AstrMessageEvent):
-        """刷新当前主账号凭证，非必要不要使用"""
+        """刷新当前主账号凭证（非必要不要使用）"""
         user_id = event.get_sender_id()
         binding = await self.user_mgr.get_primary_binding(user_id)
         if not binding:
@@ -610,7 +617,7 @@ class RocomPlugin(Star):
 
     @filter.command("洛克删除无效绑定")
     async def rocom_cleanup_bindings(self, event: AstrMessageEvent):
-        """删除所有人的无效绑定（需要 bot 管理员权限，非必要不要使用）"""
+        """删除所有人的无效绑定（需要 bot 管理员权限）"""
         # 检查 bot 管理员权限
         if not event.is_admin():
             uid = str(event.get_sender_id())
@@ -1240,3 +1247,171 @@ class RocomPlugin(Star):
             yield event.image_result(img_url)
         else:
             yield event.plain_result("阵容图生成失败。")
+
+    @filter.command("洛克查蛋", alias={"查蛋"})
+    async def rocom_search_eggs(self, event: AstrMessageEvent, arg1: str = None, arg2: str = None):
+        """查询精灵蛋组（支持名称/身高/体重反查）"""
+        if not arg1:
+            yield event.plain_result(
+                "🥚 查蛋用法：\n"
+                "  /洛克查蛋 <精灵名>     — 查询蛋组及可配种精灵\n"
+                "  /洛克查蛋 25 1.5       — 按身高(cm)+体重(kg)反查（前身高后体重）\n"
+                "  /洛克查蛋 25            — 仅按身高(cm)反查\n"
+                "  /洛克查蛋 身高25 体重1.5 — 带前缀也行"
+            )
+            return
+
+        # 解析：两个数字 = 前身高后体重；带前缀也兼容
+        height, weight = None, None
+        name_parts = []
+
+        def try_parse_num(s):
+            try:
+                return float(s)
+            except ValueError:
+                return None
+
+        nums_parsed = []
+        for raw_arg in [arg1, arg2]:
+            if raw_arg is None:
+                continue
+            arg = str(raw_arg)
+            # 带前缀的显式写法
+            if arg.startswith("身高") or arg.startswith("h") or arg.startswith("H"):
+                v = try_parse_num(arg.lstrip("身高hH"))
+                if v is not None:
+                    height = v
+                    continue
+            if arg.startswith("体重") or arg.startswith("w") or arg.startswith("W"):
+                v = try_parse_num(arg.lstrip("体重wW"))
+                if v is not None:
+                    weight = v
+                    continue
+            # 纯数字：按顺序 前身高后体重
+            v = try_parse_num(arg)
+            if v is not None:
+                nums_parsed.append(v)
+            else:
+                name_parts.append(arg)
+
+        # 纯数字按位置分配
+        if nums_parsed:
+            if height is None and len(nums_parsed) >= 1:
+                height = nums_parsed[0]
+            if weight is None and len(nums_parsed) >= 2:
+                weight = nums_parsed[1]
+
+        # 身高/体重反查模式
+        if height is not None or weight is not None:
+            results = self.egg_searcher.search_by_size(height=height, weight=weight)
+            yield event.plain_result(self.egg_searcher.build_size_search_text(height, weight, results))
+            return
+
+        # 名称查蛋模式
+        name = " ".join(name_parts)
+        if not name:
+            yield event.plain_result("请输入精灵名称。用法：/洛克查蛋 <精灵名>")
+            return
+
+        sr = self.egg_searcher.search(name)
+
+        if sr.match_type == SearchResult.MULTI:
+            yield event.plain_result(self.egg_searcher.build_candidates_text(name, sr.candidates))
+            return
+        if sr.match_type == SearchResult.NOT_FOUND:
+            yield event.plain_result(f"❌ 未找到名为「{name}」的精灵，请检查名称后重试。")
+            return
+
+        pet = sr.pet
+        hint_prefix = ""
+        if sr.match_type == SearchResult.FUZZY:
+            zh = pet.get("localized", {}).get("zh", {}).get("name", "")
+            hint_prefix = f"🔍 模糊匹配到「{zh}」\n"
+
+        try:
+            data = self.egg_searcher.build_search_data(pet)
+            data["commandHint"] = "💡 /洛克查蛋 <名称> | /洛克查蛋 身高25 体重1.5 | /洛克配种 <父> <母>"
+            data["copyright"] = "AstrBot & WeGame Locke Kingdom Plugin"
+            img_url = await self.renderer.render_html("render/searcheggs/index.html", data)
+            if img_url:
+                if hint_prefix:
+                    yield event.plain_result(hint_prefix)
+                yield event.image_result(img_url)
+            else:
+                msg = hint_prefix
+                msg += f"🥚 {data['pet_name']} (#{data['pet_id']})\n"
+                msg += f"属性：{data['type_label']}\n"
+                msg += f"蛋组：{data['egg_groups_label']}\n"
+                msg += f"可配种精灵数：{data['total_compatible']}\n"
+                if data['is_undiscovered']:
+                    msg += "⚠️ 该精灵属于「未发现」蛋组，无法配种。"
+                yield event.plain_result(msg)
+        except Exception as e:
+            logger.error(f"[Rocom] 查蛋渲染异常: {e}")
+            yield event.plain_result(f"查蛋功能异常：{e}")
+
+    @filter.command("洛克配种", alias={"配种"})
+    async def rocom_breeding_check(self, event: AstrMessageEvent, name_a: str = None, name_b: str = None):
+        """配种查询：双参数判断兼容性，单参数查询如何孵出目标精灵"""
+        if not name_a:
+            yield event.plain_result(
+                "🥚 配种用法：\n"
+                "  /洛克配种 <父体> <母体>  — 判断能否配种，孵蛋结果跟随母体\n"
+                "  /洛克配种 <精灵名>       — 查询想要该精灵需要哪些父母组合"
+            )
+            return
+
+        # 单参数模式：想要某精灵，查询怎么配
+        if not name_b:
+            sr = self.egg_searcher.search(name_a)
+            if sr.match_type == SearchResult.MULTI:
+                yield event.plain_result(self.egg_searcher.build_candidates_text(name_a, sr.candidates))
+                return
+            if sr.match_type == SearchResult.NOT_FOUND:
+                yield event.plain_result(f"❌ 未找到名为「{name_a}」的精灵。")
+                return
+            yield event.plain_result(self.egg_searcher.build_want_pet_text(sr.pet))
+            return
+
+        # 双参数模式：父体 + 母体配种判定
+        sr_a = self.egg_searcher.search(name_a)
+        if sr_a.match_type == SearchResult.MULTI:
+            yield event.plain_result(self.egg_searcher.build_candidates_text(name_a, sr_a.candidates))
+            return
+        if sr_a.match_type == SearchResult.NOT_FOUND:
+            yield event.plain_result(f"❌ 未找到名为「{name_a}」的精灵。")
+            return
+
+        sr_b = self.egg_searcher.search(name_b)
+        if sr_b.match_type == SearchResult.MULTI:
+            yield event.plain_result(self.egg_searcher.build_candidates_text(name_b, sr_b.candidates))
+            return
+        if sr_b.match_type == SearchResult.NOT_FOUND:
+            yield event.plain_result(f"❌ 未找到名为「{name_b}」的精灵。")
+            return
+
+        # 默认前父后母：father=a, mother=b，孵蛋结果跟随母体(b)
+        father, mother = sr_a.pet, sr_b.pet
+        try:
+            data = self.egg_searcher.build_pair_data(mother, father)
+            # 交换显示顺序：模板中 mother=母体(结果跟随), father=父体
+            data["commandHint"] = "💡 默认前父后母，孵蛋结果跟随母体 | /洛克配种 <精灵名> 查怎么孵"
+            data["copyright"] = "AstrBot & WeGame Locke Kingdom Plugin"
+            img_url = await self.renderer.render_html("render/searcheggs/pair.html", data)
+            if img_url:
+                yield event.image_result(img_url)
+            else:
+                ma, fa = data["mother"]["name"], data["father"]["name"]
+                if data["compatible"]:
+                    shared = " / ".join(data["shared_egg_group_labels"])
+                    yield event.plain_result(
+                        f"✅ 父体 {fa} × 母体 {ma} 可以配种！\n"
+                        f"共享蛋组：{shared}\n"
+                        f"孵出结果：{ma}（跟随母体）\n"
+                        f"孵化时长：{data['hatch_label']}"
+                    )
+                else:
+                    yield event.plain_result(f"❌ {fa} × {ma} 无法配种。\n原因：{'；'.join(data['reasons'])}")
+        except Exception as e:
+            logger.error(f"[Rocom] 配种判定渲染异常: {e}")
+            yield event.plain_result(f"配种判定功能异常：{e}")

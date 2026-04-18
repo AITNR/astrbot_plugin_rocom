@@ -261,9 +261,25 @@ class Renderer:
 
         try:
             async with self._lock:
-                if not self._playwright:
+                # 确保 playwright 和 browser 可用，处理 stale 实例
+                try:
+                    if not self._playwright:
+                        self._playwright = await async_playwright().start()
+                    if not self._browser or not self._browser.is_connected():
+                        self._browser = await self._playwright.chromium.launch()
+                except Exception:
+                    # playwright 或 browser 实例已损坏，重建
+                    try:
+                        if self._browser:
+                            await self._browser.close()
+                    except Exception:
+                        pass
+                    try:
+                        if self._playwright:
+                            await self._playwright.stop()
+                    except Exception:
+                        pass
                     self._playwright = await async_playwright().start()
-                if not self._browser:
                     self._browser = await self._playwright.chromium.launch()
 
             context = await self._browser.new_context(
@@ -312,6 +328,7 @@ class Renderer:
                         '.exchange-page',
                         '.record-page', 
                         '.package-cont',
+                        '.searcheggs-cont',
                         '.page-section-main',
                         '.lineup-page'
                     ];

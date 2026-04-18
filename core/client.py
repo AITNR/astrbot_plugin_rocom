@@ -71,11 +71,34 @@ class RocomClient:
             resp = await client.get(
                 f"{self.base_url}{path}", headers=headers, params=params
             )
-            data = resp.json()
+            
+            # 检查响应状态码
+            if resp.status_code != 200:
+                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code}")
+                return None
+            
+            # 检查响应内容是否为空
+            if not resp.text or not resp.text.strip():
+                logger.warning(f"[Rocom API] {path} 响应为空")
+                return None
+            
+            # 安全解析 JSON
+            try:
+                data = resp.json()
+            except Exception as json_err:
+                logger.warning(f"[Rocom API] {path} JSON 解析失败: {json_err}, 响应内容: {resp.text[:200]}")
+                return None
+            
             if data.get("code") != 0:
                 logger.warning(f"[Rocom API] {path} 错误: {data.get('message', '未知')}")
                 return None
             return data.get("data", {})
+        except httpx.TimeoutException:
+            logger.error(f"[Rocom API] GET {path} 请求超时")
+            return None
+        except httpx.RequestError as e:
+            logger.error(f"[Rocom API] GET {path} 请求失败: {e}")
+            return None
         except Exception as e:
             logger.error(f"[Rocom API] GET {path} 异常: {e}")
             return None
@@ -95,11 +118,34 @@ class RocomClient:
                 json=json_data,
                 params=params,
             )
-            data = resp.json()
+            
+            # 检查响应状态码
+            if resp.status_code != 200:
+                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code}")
+                return None
+            
+            # 检查响应内容是否为空
+            if not resp.text or not resp.text.strip():
+                logger.warning(f"[Rocom API] {path} 响应为空")
+                return None
+            
+            # 安全解析 JSON
+            try:
+                data = resp.json()
+            except Exception as json_err:
+                logger.warning(f"[Rocom API] {path} JSON 解析失败: {json_err}, 响应内容: {resp.text[:200]}")
+                return None
+            
             if data.get("code") != 0:
                 logger.warning(f"[Rocom API] {path} 错误: {data.get('message', '未知')}")
                 return None
             return data.get("data", {})
+        except httpx.TimeoutException:
+            logger.error(f"[Rocom API] POST {path} 请求超时")
+            return None
+        except httpx.RequestError as e:
+            logger.error(f"[Rocom API] POST {path} 请求失败: {e}")
+            return None
         except Exception as e:
             logger.error(f"[Rocom API] POST {path} 异常: {e}")
             return None
@@ -110,11 +156,34 @@ class RocomClient:
         try:
             client = await self._get_client()
             resp = await client.delete(f"{self.base_url}{path}", headers=headers)
-            data = resp.json()
+            
+            # 检查响应状态码
+            if resp.status_code != 200:
+                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code}")
+                return None
+            
+            # 检查响应内容是否为空
+            if not resp.text or not resp.text.strip():
+                logger.warning(f"[Rocom API] {path} 响应为空")
+                return None
+            
+            # 安全解析 JSON
+            try:
+                data = resp.json()
+            except Exception as json_err:
+                logger.warning(f"[Rocom API] {path} JSON 解析失败: {json_err}, 响应内容: {resp.text[:200]}")
+                return None
+            
             if data.get("code") != 0:
                 logger.warning(f"[Rocom API] {path} 错误: {data.get('message', '未知')}")
                 return None
             return data.get("data", {})
+        except httpx.TimeoutException:
+            logger.error(f"[Rocom API] DELETE {path} 请求超时")
+            return None
+        except httpx.RequestError as e:
+            logger.error(f"[Rocom API] DELETE {path} 请求失败: {e}")
+            return None
         except Exception as e:
             logger.error(f"[Rocom API] DELETE {path} 异常: {e}")
             return None
