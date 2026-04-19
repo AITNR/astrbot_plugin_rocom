@@ -1,6 +1,6 @@
 name: astrbot_plugin_rocom
 display_name: 洛克王国数据查询
-desc: 基于熵增项目组API的洛克王国数据查询插件，支持远行商人 个人信息 精灵查询 交换大厅 图鉴 配队攻略等。
+desc: 基于熵增项目组API的洛克王国数据查询插件，支持远行商人 个人信息 精灵查询 交换大厅 图鉴 配队攻略等查询渲染。
 version: "2.2.0"
 author: bvzrays & 熵增项目组
 repo: https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom
