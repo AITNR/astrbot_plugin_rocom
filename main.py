@@ -492,7 +492,15 @@ class RocomPlugin(Star):
             "round_info": round_info,
             "products": products,
         }
-        img_url = await self.renderer.render_html("render/yuanxing-shangren/index.html", data)
+        img_url = await self.renderer.render_html(
+            "render/yuanxing-shangren/index.html",
+            data,
+            {
+                "device_scale_factor": 3,
+                "viewport_width": 1600,
+                "viewport_height": 1200,
+            },
+        )
         return img_url, res, products, round_info
 
     async def _check_merchant_subscriptions(self):

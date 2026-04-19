@@ -284,9 +284,14 @@ class Renderer:
                     self._playwright = await async_playwright().start()
                     self._browser = await self._playwright.chromium.launch()
 
+            options = options or {}
+            device_scale_factor = float(options.get("device_scale_factor", 2.0))
+            viewport_width = int(options.get("viewport_width", 1400))
+            viewport_height = int(options.get("viewport_height", 900))
+
             context = await self._browser.new_context(
-                device_scale_factor=2.0,
-                viewport={"width": 1400, "height": 900},
+                device_scale_factor=device_scale_factor,
+                viewport={"width": viewport_width, "height": viewport_height},
             )
             page = await context.new_page()
 
