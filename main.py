@@ -3,6 +3,7 @@ import time
 import base64
 import tempfile
 import asyncio
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
@@ -526,6 +527,31 @@ class RocomPlugin(Star):
             sub["last_matched_items"] = matched
             await self.merchant_sub_mgr.upsert_subscription(key, sub)
 
+    def _split_merchant_subscription_items(self, raw_text: str) -> List[str]:
+        parts = re.split(r"[\s,，、/|；;]+", raw_text.strip())
+        items = []
+        seen = set()
+        for part in parts:
+            name = str(part or "").strip()
+            if not name or name in seen:
+                continue
+            items.append(name)
+            seen.add(name)
+        return items
+
+    def _parse_merchant_subscription_args(self, raw_text: str) -> tuple[bool, List[str] | None]:
+        text = str(raw_text or "").strip()
+        if not text:
+            return False, None
+        tokens = text.split(maxsplit=1)
+        mention = False
+        items_text = text
+        if tokens and tokens[0] in {"0", "1"}:
+            mention = tokens[0] == "1"
+            items_text = tokens[1] if len(tokens) > 1 else ""
+        items = self._split_merchant_subscription_items(items_text) if items_text else None
+        return mention, items or None
+
     def _wiki_asset_id(self, number: Any) -> int | None:
         try:
             numeric_id = int(number)
@@ -744,7 +770,13 @@ class RocomPlugin(Star):
                         {"cmd": "洛克背包 <筛选> <页码>", "desc": "查看精灵收集 (筛选:全部/异色/了不起/炫彩，参数可交换)"},
                         {"cmd": "洛克阵容 <分类> <页码>", "desc": "查看阵容助手推荐阵容 (参数可交换)"},
                         {"cmd": "洛克交换大厅 <页码>", "desc": "查看交换大厅海报 (支持别名：洛克大厅/交换大厅)"},
+                        {"cmd": "远行商人", "desc": "查看当前轮次远行商人商品"},
+                        {"cmd": "订阅远行商人 [1/0] [商品...]", "desc": "群主/群管/bot管理可配置本群订阅商品，不填商品则用默认配置"},
+                        {"cmd": "取消订阅远行商人", "desc": "关闭当前群远行商人订阅"},
+                        {"cmd": "洛克wiki <精灵名>", "desc": "查询精灵 wiki"},
+                        {"cmd": "洛克技能 <技能名>", "desc": "查询技能 wiki"},
                         {"cmd": "洛克查蛋 <精灵名>", "desc": "查询精灵蛋组及可配种精灵 (支持别名：查蛋)"},
+                        {"cmd": "洛克查蛋 25 1.5", "desc": "按身高和体重反查精灵，双参数优先使用后端尺寸查询"},
                         {"cmd": "洛克配种 <精灵A> <精灵B>", "desc": "判断两只精灵能否配种 (支持别名：配种)"}
                     ]
                 },
@@ -1496,7 +1528,7 @@ class RocomPlugin(Star):
         )
 
     @filter.command("订阅远行商人")
-    async def subscribe_merchant(self, event: AstrMessageEvent, mention_all: str = "0"):
+    async def subscribe_merchant(self, event: AstrMessageEvent, args: str = ""):
         """订阅远行商人商品提醒"""
         if event.is_private_chat():
             yield event.plain_result("该命令仅支持群聊使用。")
@@ -1504,7 +1536,8 @@ class RocomPlugin(Star):
         if not await self._is_group_admin(event):
             yield event.plain_result("仅当前群管理员可以配置远行商人订阅。")
             return
-        mention = str(mention_all).strip() == "1"
+        mention, custom_items = self._parse_merchant_subscription_args(args)
+        selected_items = list(custom_items or self.merchant_subscription_items)
         group_id = str(event.get_group_id())
         await self.merchant_sub_mgr.upsert_subscription(
             group_id,
@@ -1512,16 +1545,18 @@ class RocomPlugin(Star):
                 "group_id": group_id,
                 "umo": event.unified_msg_origin,
                 "mention_all": mention,
-                "items": list(self.merchant_subscription_items),
+                "items": selected_items,
                 "last_push_round": "",
                 "last_matched_items": [],
                 "updated_by": str(event.get_sender_id()),
             },
         )
+        source_hint = "本群自定义商品" if custom_items else "WebUI 默认商品"
         yield event.plain_result(
-            f"已订阅远行商人，监听商品：{'、'.join(self.merchant_subscription_items)}；"
+            f"已订阅远行商人，监听商品：{'、'.join(selected_items)}（{source_hint}）；"
             f"命中后{'会' if mention else '不会'}@全体。\n"
             f"订阅方式：/订阅远行商人 1 为 @全体，/订阅远行商人 0 为不@全体，"
+            f"/订阅远行商人 1 国王球 棱镜球 为本群自定义商品，"
             f"/取消订阅远行商人 可关闭订阅。"
         )
 

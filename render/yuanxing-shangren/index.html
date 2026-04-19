@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>远行商人</title>
     <style>
+@font-face {
+    font-family: "fzlant";
+    src: url("{{_res_path}}ttf/fzlant.D5FI9Et0.ttf");
+}
+
+@font-face {
+    font-family: "dundun";
+    src: url("{{_res_path}}ttf/dundun.xHd_Ee5-.woff2");
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -12,7 +22,8 @@
 }
 
 :root {
-    --font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-family: "fzlant", "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-family-accent: "dundun", "fzlant", "Microsoft YaHei", sans-serif;
     --text-1: #332719;
     --text-2: #6b5846;
     --line: rgba(118, 97, 74, 0.22);
@@ -97,6 +108,7 @@ body {
 }
 
 .title-text {
+    font-family: var(--font-family-accent);
     font-size: 42px;
     font-weight: 900;
     letter-spacing: 2px;
@@ -126,6 +138,7 @@ body {
 }
 
 .summary-chip strong {
+    font-family: var(--font-family-accent);
     color: #a0631d;
     font-size: 28px;
     margin-left: 8px;
@@ -195,6 +208,7 @@ body {
 }
 
 .product-name {
+    font-family: var(--font-family-accent);
     font-size: 34px;
     font-weight: 800;
     line-height: 1.2;
