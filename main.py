@@ -18,7 +18,7 @@ from .core.user import UserManager, MerchantSubscriptionManager
 from .core.render import Renderer
 from .core.egg_service import EggService, SearchResult
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.1.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.2.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -549,6 +549,10 @@ class RocomPlugin(Star):
         return items
 
     def _parse_merchant_subscription_args(self, raw_text: str) -> tuple[bool, List[str] | None]:
+        """解析远行商人订阅参数
+        返回：(是否@全体，自定义商品列表)
+        商品列表为 None 表示使用默认配置
+        """
         text = str(raw_text or "").strip()
         if not text:
             return False, None
@@ -558,8 +562,9 @@ class RocomPlugin(Star):
         if tokens and tokens[0] in {"0", "1"}:
             mention = tokens[0] == "1"
             items_text = tokens[1] if len(tokens) > 1 else ""
-        items = self._split_merchant_subscription_items(items_text) if items_text else None
-        return mention, items or None
+        items = self._split_merchant_subscription_items(items_text) if items_text.strip() else None
+        # 只有当 items 非空时才返回，否则返回 None 表示使用默认配置
+        return mention, items if items else None
 
     def _wiki_asset_id(self, number: Any) -> int | None:
         try:
@@ -1545,8 +1550,17 @@ class RocomPlugin(Star):
         if not await self._is_group_admin(event):
             yield event.plain_result("仅当前群管理员可以配置远行商人订阅。")
             return
-        mention, custom_items = self._parse_merchant_subscription_args(args)
-        selected_items = list(custom_items or self.merchant_subscription_items)
+        
+        # 从 event.message_str 中提取完整参数，避免 AstrBot 按空格拆分
+        full_cmd = event.message_str or ""
+        if "订阅远行商人" in full_cmd:
+            args_text = full_cmd.split("订阅远行商人", 1)[1].strip()
+        else:
+            args_text = args.strip()
+        
+        mention, custom_items = self._parse_merchant_subscription_args(args_text)
+        # custom_items 为 None 时使用默认配置，否则使用自定义商品
+        selected_items = list(custom_items) if custom_items is not None else list(self.merchant_subscription_items)
         group_id = str(event.get_group_id())
         await self.merchant_sub_mgr.upsert_subscription(
             group_id,
@@ -1560,7 +1574,7 @@ class RocomPlugin(Star):
                 "updated_by": str(event.get_sender_id()),
             },
         )
-        source_hint = "本群自定义商品" if custom_items else "WebUI 默认商品"
+        source_hint = "本群自定义商品" if custom_items is not None else "WebUI 默认商品"
         yield event.plain_result(
             f"已订阅远行商人，监听商品：{'、'.join(selected_items)}（{source_hint}）；"
             f"命中后{'会' if mention else '不会'}@全体。\n"

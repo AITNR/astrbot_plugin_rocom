@@ -12,7 +12,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=45B7D1)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/issues)
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-FFc65f?style=for-the-badge\&logo=python)](https://github.com/Soulter/AstrBot)
 
-### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.1.0
+### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.2.0
 
 ### 扫码绑定 · 个人档案 · 最近战绩 · 精灵背包 · 阵容助手
 
@@ -201,16 +201,6 @@ astrbot_plugin_rocom/
 |:---:|:---:|
 | <img width="1640" height="4348" alt="cf5e99b9fd2bef74b4a39cc5c44ba3a3" src="https://github.com/user-attachments/assets/fa6e756e-b7e5-4f7a-9928-75dbb7931b59" /> | <img width="1280" height="952" alt="54c8265461499be1160ccedf6248f3d4_720" src="https://github.com/user-attachments/assets/06e6e587-364d-4fbf-928c-011c42a9f19f" /> |
 
-### 后续补图模板
-
-把下面的 `图片链接` 替换掉即可：
-
-```md
-| `功能名A` | `功能名B` |
-|:---:|:---:|
-| <img width="1600" alt="功能名A" src="图片链接A"> | <img width="1600" alt="功能名B" src="图片链接B"> |
-```
-
 </details>
 
 ***
@@ -242,6 +232,12 @@ astrbot_plugin_rocom/
 
 <details>
 <summary>点击展开版本历史</summary>
+
+### v2.2.0 (2026-04-19)
+
+**修复**
+- 修复远行商人自定义订阅功能，现在可以正确解析自定义商品名称
+- 优化命令参数解析逻辑，从 `event.message_str` 中提取完整参数避免被 AstrBot 按空格拆分
 
 ### v2.1.0 (2026-04-19)
 
