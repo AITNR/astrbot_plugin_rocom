@@ -18,7 +18,7 @@ from .core.user import UserManager, MerchantSubscriptionManager
 from .core.render import Renderer
 from .core.egg_service import EggService, SearchResult
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.0.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.1.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -508,21 +508,30 @@ class RocomPlugin(Star):
             matched = [name for name in items if name in product_names]
             if not matched or sub.get("last_push_round") == round_info["round_id"]:
                 continue
-            chain = MessageChain()
+            text_chain = MessageChain()
             if sub.get("mention_all"):
-                chain.at_all()
-            chain.message(
+                text_chain.at_all()
+            text_chain.message(
                 f"远行商人本轮命中订阅商品：{'、'.join(matched)}\n轮次：第{round_info['current']}轮\n剩余：{round_info['countdown']}"
             )
-            if img_url:
-                chain.file_image(img_url)
             try:
-                await self.context.send_message(sub["umo"], chain)
-            except Exception:
+                await self.context.send_message(sub["umo"], text_chain)
+            except Exception as e:
+                logger.warning(f"[Rocom] 远行商人订阅文本推送失败: {e}")
                 fallback = MessageChain().message(
                     f"远行商人本轮命中订阅商品：{'、'.join(matched)}"
                 )
-                await self.context.send_message(sub["umo"], fallback)
+                try:
+                    await self.context.send_message(sub["umo"], fallback)
+                except Exception as fallback_e:
+                    logger.warning(f"[Rocom] 远行商人订阅降级文本推送失败: {fallback_e}")
+                    continue
+            if img_url:
+                try:
+                    image_chain = MessageChain().file_image(img_url)
+                    await self.context.send_message(sub["umo"], image_chain)
+                except Exception as image_e:
+                    logger.warning(f"[Rocom] 远行商人订阅图片推送失败: {image_e}")
             sub["last_push_round"] = round_info["round_id"]
             sub["last_matched_items"] = matched
             await self.merchant_sub_mgr.upsert_subscription(key, sub)
