@@ -177,8 +177,6 @@ astrbot_plugin_rocom/
 <details open>
 <summary>点击展开预览图</summary>
 
-### 已展示
-
 | `洛克档案` | `洛克战绩` |
 |:---:|:---:|
 | <img width="1886" height="1072" alt="image" src="https://github.com/user-attachments/assets/fd92e4f2-8ed1-4522-ae7e-25ad3f64024d"> | <img width="1920" height="512" alt="image" src="https://github.com/user-attachments/assets/df897cf8-c16c-4d7a-8d3a-b6b578e6d7a5"> |
@@ -191,19 +189,17 @@ astrbot_plugin_rocom/
 |:---:|:---:|
 | <img width="2440" height="1854" alt="image" src="https://github.com/user-attachments/assets/3fb6f800-cae6-4a1b-9b14-1cc2715e0973"> | 阵容详细信息 |
 
-### 预留展示位
-
 | `远行商人` | `精灵 Wiki` |
 |:---:|:---:|
-| 待补充截图 | 待补充截图 |
+| <img width="1280" height="718" alt="0169749e11298492f0007497fe7b73ec_720" src="https://github.com/user-attachments/assets/0ab6bbd3-c115-4ee6-af54-102ab3f2404a" /> | <img width="1840" height="6164" alt="6bd48e838ede2c2784681cef61bb0c76" src="https://github.com/user-attachments/assets/9aa29eca-eb9a-4bab-9664-29c12e5f11e6" /> |
 
 | `技能 Wiki` | `查蛋结果` |
 |:---:|:---:|
-| 待补充截图 | 待补充截图 |
+| <img width="1840" height="1484" alt="296f9d0065784d170188c265f168c225" src="https://github.com/user-attachments/assets/ed90833e-3043-45ff-a96b-e328a14d48f1" /> | <img width="1640" height="4646" alt="2253648a42048a2cabf9ee6a18e14fc8" src="https://github.com/user-attachments/assets/76176462-40d5-482a-95b9-9e73df73cd94" /> |
 
 | `尺寸反查` | `配种结果` |
 |:---:|:---:|
-| 待补充截图 | 待补充截图 |
+| <img width="1640" height="4348" alt="cf5e99b9fd2bef74b4a39cc5c44ba3a3" src="https://github.com/user-attachments/assets/fa6e756e-b7e5-4f7a-9928-75dbb7931b59" /> | <img width="1280" height="952" alt="54c8265461499be1160ccedf6248f3d4_720" src="https://github.com/user-attachments/assets/06e6e587-364d-4fbf-928c-011c42a9f19f" /> |
 
 ### 后续补图模板
 
