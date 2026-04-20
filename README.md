@@ -3,7 +3,6 @@
 # 🏰 astrbot\_plugin\_rocom
 # 由于前端正在构建，正式发布前端前可使用测试
 # key：sk-ff14f964051a5c966564e29b5bd3a768
-# 同时，目前的账号凭证刷新有些问题，晚点服务端会解决，现在凭证只能保持一天
 ### *WeGame 洛克王国数据查询*
 
 <img src="https://github.com/user-attachments/assets/446759b3-c9d8-4752-800c-acf47d55e70f" width="400" alt="LOGO">
@@ -13,7 +12,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=45B7D1)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/issues)
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-FFc65f?style=for-the-badge\&logo=python)](https://github.com/Soulter/AstrBot)
 
-### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.2.0
+### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.2.1
 
 ### 扫码绑定 · 个人档案 · 最近战绩 · 精灵背包 · 阵容助手
 
@@ -157,7 +156,7 @@ astrbot_plugin_rocom/
 | `洛克背包 [分类] [页码]` | 展示对应条件精选收藏情况，支持分类如 `了不起`、`异色`、`炫彩` 等 |
 | `洛克交换大厅 [页码]`    | 浏览其他玩家的精灵交换请求列表                      |
 | `远行商人` | 查询当前轮次远行商人商品 |
-| `订阅远行商人 [1/0]` | 当前群管理员订阅远行商人提醒，`1` 为命中后 `@全体`，`0` 为普通提醒 |
+| `订阅远行商人 [1/0] [商品...]` | 群主/群管理员/bot管理员可订阅远行商人提醒，`1` 为命中后 `@全体`，`0` 为普通提醒；不填商品则使用 WebUI 默认订阅商品 |
 | `取消订阅远行商人` | 关闭当前群远行商人订阅 |
 | `洛克阵容 <分类> <页码>` | 查看热门阵容推荐及组成，2x3 网格布局展示               |
 | `查看阵容 <阵容码>`     | 查看指定阵容的详细信息，包含精灵技能配置                 |
@@ -240,6 +239,13 @@ astrbot_plugin_rocom/
 
 <details>
 <summary>点击展开版本历史</summary>
+
+### v2.2.1 (2026-04-20)
+
+**优化**
+- 帮助菜单以及查蛋相关统一切换为 `HYWenHei-85W-1.ttf` 字体
+- 菜单背景新增轻量深色遮罩，降低过亮区域对文字可读性的影响
+- README 同步远行商人订阅命令格式与当前权限说明
 
 ### v2.2.0 (2026-04-19)
 

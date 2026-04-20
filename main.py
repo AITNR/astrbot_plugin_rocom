@@ -18,7 +18,7 @@ from .core.user import UserManager, MerchantSubscriptionManager
 from .core.render import Renderer
 from .core.egg_service import EggService, SearchResult
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.2.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.2.1", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -775,6 +775,7 @@ class RocomPlugin(Star):
             "menuGroups": [
                 {
                     "groupTitle": "账号管理与登录",
+                    "groupSubtitle": "绑定用户信息",
                     "menuItems": [
                         {"cmd": "洛克 QQ 登录", "desc": "使用 QQ 扫码快捷登录及绑定"},
                         {"cmd": "洛克微信登录", "desc": "使用微信扫码快捷登录及绑定"},
@@ -786,6 +787,7 @@ class RocomPlugin(Star):
                 },
                 {
                     "groupTitle": "数据查询",
+                    "groupSubtitle": "查询推送服务",
                     "menuItems": [
                         {"cmd": "洛克档案", "desc": "生成个人数据名片"},
                         {"cmd": "洛克战绩 <页码>", "desc": "查询并展示近期的对战场次记录"},
@@ -804,6 +806,7 @@ class RocomPlugin(Star):
                 },
                 {
                     "groupTitle": "多账号操作",
+                    "groupSubtitle": "账号切换与管理",
                     "menuItems": [
                         {"cmd": "洛克绑定列表", "desc": "查看所有已扫码绑定的账号"},
                         {"cmd": "洛克切换 <序号>", "desc": "一键切换活跃的数据查询主账号"},

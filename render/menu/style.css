@@ -1,7 +1,6 @@
 @font-face {
     font-family: 'mianfeiziti';
-    src: url('../../ttf/dundun.xHd_Ee5-.woff2') format('woff2'),
-         url('../../ttf/dundun.BCbg_KoL.ttf') format('truetype');
+    src: url('../../ttf/HYWenHei-85W-1.ttf') format('truetype');
     font-display: swap;
 }
 
@@ -19,7 +18,6 @@ body {
 
 .menu-cont {
   width: 780px;
-  /* 使用指定的 ercode-bg.D1ccSQKH.png 作为底层背景 */
   background: url("../../img/ercode-bg.D1ccSQKH.png") no-repeat center center;
   background-size: 100% 100%;
   position: relative;
@@ -27,23 +25,30 @@ body {
   box-sizing: border-box;
 }
 
-/* 底部叠加半透明小洛克 */
+.menu-cont::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(28, 22, 18, 0.18);
+  z-index: 1;
+  pointer-events: none;
+}
+
 .xiaoluoke-overlay {
   position: absolute;
   bottom: -15px;
   right: -30px;
   width: 320px;
   opacity: 0.15;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
 }
 
 .menu-page {
   position: relative;
-  z-index: 2;
+  z-index: 3;
 }
 
-/* Header采用与其他渲染模板相同的暖色风格化字体和风格 */
 .header-center {
   text-align: center;
   margin-bottom: 30px;
@@ -87,33 +92,30 @@ body {
   gap: 15px;
 }
 
-/* 指令项使用指定的 player-bg.png 作为背景 */
 .menu-item {
   width: 100%;
-  height: 85px; 
+  min-height: 85px;
   background: url("../../img/player-bg.png") no-repeat center center;
   background-size: 100% 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 25px;
+  padding: 12px 50px 12px 25px;
   box-sizing: border-box;
-  /* 确保文字不会跟右侧的小宠物图标产生过度的文字重叠，可以在右侧留出些空间 */
-  padding-right: 50px; 
 }
 
-/* 上半部分指令 */
 .menu-item-cmd {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: bold;
   color: #5a3e1b;
   margin-bottom: 8px;
+  line-height: 1.2;
 }
 
-/* 下半部分描述 */
 .menu-item-desc {
-  font-size: 14px;
+  font-size: 16px;
   color: #8c7a61;
+  line-height: 1.3;
 }
 
 .footer {
