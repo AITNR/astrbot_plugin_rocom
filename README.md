@@ -3,6 +3,7 @@
 # 🏰 astrbot\_plugin\_rocom
 # 由于前端正在构建，正式发布前端前可使用测试
 # key：sk-ff14f964051a5c966564e29b5bd3a768
+# 同时，目前的账号凭证刷新有些问题，晚点服务端会解决，现在凭证只能保持一天
 ### *WeGame 洛克王国数据查询*
 
 <img src="https://github.com/user-attachments/assets/446759b3-c9d8-4752-800c-acf47d55e70f" width="400" alt="LOGO">
