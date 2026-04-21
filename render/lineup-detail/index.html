@@ -30,18 +30,23 @@
     <div class="pet-detail-list">
       {{each lineup.pets pet}}
       <div class="pet-detail-item">
-        <div class="pet-detail-avatar">
-          <img src="{{pet.pet_img_url}}" onerror="this.src='{{fallbackPetImage}}'">
-          {{if pet.bloodline}}
-          <div class="bloodline-badge">
-            <img src="{{pet.bloodline_icon}}" alt="">
+        <div class="pet-detail-main">
+          <div class="pet-detail-avatar">
+            <img src="{{pet.pet_img_url}}" onerror="this.src='{{fallbackPetImage}}'">
+            {{if pet.bloodline}}
+            <div class="bloodline-badge">
+              <img src="{{pet.bloodline_icon}}" alt="">
+            </div>
+            {{/if}}
           </div>
-          {{/if}}
+          <div class="pet-detail-name">{{pet.pet_name}}</div>
         </div>
-        <div class="pet-detail-name">{{pet.pet_name}}</div>
         <div class="pet-detail-skills">
           {{each pet.skills skill}}
-          <img class="skill-detail-icon" src="{{skill}}" alt="">
+          <div class="skill-detail-item">
+            <img class="skill-detail-icon" src="{{skill.icon}}" alt="{{skill.name}}">
+            <div class="skill-detail-name">{{skill.name}}</div>
+          </div>
           {{/each}}
         </div>
       </div>
