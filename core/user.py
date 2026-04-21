@@ -100,6 +100,43 @@ class UserManager(AsyncDataManager):
         existing.append(binding)
         await self.save_user_bindings(user_id, existing)
 
+    async def replace_binding_for_role(self, user_id: Any, binding: Dict) -> Dict[str, Any]:
+        """
+        用新绑定覆盖同一用户下相同 role_id 的旧绑定。
+
+        安全顺序：
+        1. 读取当前用户全部绑定
+        2. 清理相同 role_id 的旧绑定（包括旧 token / 旧 binding_id）
+        3. 写入新绑定并设为主账号
+        """
+        user_id = str(user_id)
+        role_id = str(binding.get("role_id", "") or "")
+        new_binding_id = binding.get("binding_id") or binding.get("framework_token", "")
+        removed_items = []
+
+        existing = await self.get_user_bindings(user_id)
+        kept = []
+        for item in existing:
+            item_role_id = str(item.get("role_id", "") or "")
+            item_binding_id = item.get("binding_id") or item.get("framework_token", "")
+            if role_id and item_role_id == role_id:
+                removed_items.append(item)
+                continue
+            if new_binding_id and item_binding_id == new_binding_id:
+                removed_items.append(item)
+                continue
+            item["is_primary"] = False
+            kept.append(item)
+
+        binding["is_primary"] = True
+        kept.append(binding)
+        await self.save_user_bindings(user_id, kept)
+
+        return {
+            "removed_count": len(removed_items),
+            "removed_items": removed_items,
+        }
+
     async def delete_user_binding(self, user_id: Any, index: int) -> Optional[Dict]:
         """按序号(1-based)删除绑定，返回被删除的绑定"""
         user_id = str(user_id)
