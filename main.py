@@ -479,42 +479,6 @@ class RocomPlugin(Star):
         return activity, products
 
 
-    def _sort_merchant_products(self, products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """按时间段+名称稳定排序，方便阅读。"""
-        def _key(item: Dict[str, Any]):
-            return (str(item.get("time_label", "")), str(item.get("name", "")))
-        return sorted(products or [], key=_key)
-
-    def _format_merchant_broadcast_text(
-        self,
-        round_info: Dict[str, Any],
-        products: List[Dict[str, Any]],
-        matched: List[str],
-        subscribed: List[str],
-    ) -> str:
-        round_label = f"第{round_info.get('current', '?')}轮" if round_info.get("current") else "休市时段"
-        remain = round_info.get("countdown", "--")
-        subscribed_text = "、".join(subscribed) if subscribed else "（未配置，使用默认）"
-        matched_text = "、".join(matched) if matched else "本轮未命中"
-
-        lines = []
-        for i, item in enumerate(products, 1):
-            name = item.get("name", "未知商品")
-            time_label = item.get("time_label", "当前轮次")
-            lines.append(f"{i:02d}. {name}  ·  {time_label}")
-
-        body = "\n".join(lines) if lines else "（本轮暂无商品）"
-
-        return (
-            "📣 远行商人轮次播报\n"
-            f"轮次：{round_label}\n"
-            f"剩余：{remain}\n"
-            f"本群订阅：{subscribed_text}\n"
-            f"命中订阅：{matched_text}\n"
-            "————————————\n"
-            f"本轮商品（{len(products)}）：\n{body}"
-        )
-
     async def _render_merchant_image(self, refresh: bool = False):
         res = await self.client.get_merchant_info(refresh=refresh)
         activity, products = self._merchant_products_from_response(res)
@@ -546,53 +510,37 @@ class RocomPlugin(Star):
         img_url, _, products, round_info = await self._render_merchant_image(refresh=True)
         if not round_info["is_open"]:
             return
-
-        sorted_products = self._sort_merchant_products(products)
-        product_names = {p.get("name", "") for p in sorted_products}
-        round_id = round_info["round_id"]
-
+        product_names = {p.get("name", "") for p in products}
         for key, sub in all_subs.items():
-            subscribed_items = list(sub.get("items") or self.merchant_subscription_items)
-            matched = [name for name in subscribed_items if name in product_names]
-            is_new_round = sub.get("last_push_round") != round_id
-
-            # 轮次触发时：无论是否命中订阅，都做全量播报
-            if not is_new_round:
+            items = sub.get("items") or self.merchant_subscription_items
+            matched = [name for name in items if name in product_names]
+            if not matched or sub.get("last_push_round") == round_info["round_id"]:
                 continue
-
             text_chain = MessageChain()
             if sub.get("mention_all"):
                 text_chain.at_all()
             text_chain.message(
-                self._format_merchant_broadcast_text(
-                    round_info=round_info,
-                    products=sorted_products,
-                    matched=matched,
-                    subscribed=subscribed_items,
-                )
+                f"远行商人本轮命中订阅商品：{'、'.join(matched)}\n轮次：第{round_info['current']}轮\n剩余：{round_info['countdown']}"
             )
-
             try:
                 await self.context.send_message(sub["umo"], text_chain)
             except Exception as e:
-                logger.warning(f"[Rocom] 远行商人轮次播报文本推送失败: {e}")
+                logger.warning(f"[Rocom] 远行商人订阅文本推送失败: {e}")
                 fallback = MessageChain().message(
-                    f"远行商人第{round_info.get('current', '?')}轮已刷新，商品数：{len(sorted_products)}，命中订阅：{'、'.join(matched) if matched else '无'}"
+                    f"远行商人本轮命中订阅商品：{'、'.join(matched)}"
                 )
                 try:
                     await self.context.send_message(sub["umo"], fallback)
                 except Exception as fallback_e:
-                    logger.warning(f"[Rocom] 远行商人轮次播报降级文本推送失败: {fallback_e}")
+                    logger.warning(f"[Rocom] 远行商人订阅降级文本推送失败: {fallback_e}")
                     continue
-
             if img_url:
                 try:
                     image_chain = MessageChain().file_image(img_url)
                     await self.context.send_message(sub["umo"], image_chain)
                 except Exception as image_e:
-                    logger.warning(f"[Rocom] 远行商人轮次播报图片推送失败: {image_e}")
-
-            sub["last_push_round"] = round_id
+                    logger.warning(f"[Rocom] 远行商人订阅图片推送失败: {image_e}")
+            sub["last_push_round"] = round_info["round_id"]
             sub["last_matched_items"] = matched
             await self.merchant_sub_mgr.upsert_subscription(key, sub)
 
