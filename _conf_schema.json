@@ -2,7 +2,7 @@
   "wegame_api_key": {
     "type": "string",
     "description": "WeGame API Key",
-    "hint": "用于访问 WeGame API 的开发者密钥",
+    "hint": "用于访问 WeGame作用域 API 的开发者密钥，前往xxxx获取（前端待补全，目前请使用公用key）",
     "default": ""
   },
   "api_base_url": {
