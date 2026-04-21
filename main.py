@@ -18,7 +18,7 @@ from .core.user import UserManager, MerchantSubscriptionManager
 from .core.render import Renderer
 from .core.egg_service import EggService, SearchResult
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.2.1", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.3.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -36,6 +36,7 @@ class RocomPlugin(Star):
         self.merchant_sub_mgr = MerchantSubscriptionManager(data_dir)
         
         render_timeout = self.config.get("render_timeout", 30000)
+        self.help_prefix_display = str(self.config.get("help_prefix_display", "") or "")
         # res_path point to astrbot_plugin_rocom directory
         res_path = os.path.abspath(os.path.dirname(__file__))
         self.renderer = Renderer(res_path=res_path, render_timeout=render_timeout)
@@ -766,13 +767,48 @@ class RocomPlugin(Star):
             "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
         }
 
+    def _normalize_query_text(self, text: str) -> str:
+        return re.sub(r"\s+", "", str(text or "")).strip().lower()
+
+    def _find_exact_skill_match(self, results: List[Dict[str, Any]], query: str) -> Dict[str, Any] | None:
+        normalized_query = self._normalize_query_text(query)
+        if not normalized_query:
+            return None
+        for item in results:
+            name = item.get("name", "")
+            form = item.get("form", "")
+            candidates = [
+                self._normalize_query_text(name),
+                self._normalize_query_text(f"{name}{form}"),
+                self._normalize_query_text(f"{name} {form}"),
+            ]
+            if normalized_query in candidates:
+                return item
+        return None
+
+    def _normalize_lineup_lookup_id(self, raw_value: str) -> str:
+        text = str(raw_value or "").strip()
+        match = re.search(r"\d+", text)
+        if match:
+            return match.group(0)
+        return text
+
+    def _is_target_lineup(self, lineup: Dict[str, Any], lineup_id: str) -> bool:
+        target = self._normalize_lineup_lookup_id(lineup_id)
+        if not target:
+            return False
+        lineup_candidates = {
+            self._normalize_lineup_lookup_id(lineup.get("id", "")),
+            self._normalize_lineup_lookup_id(lineup.get("code", "")),
+            self._normalize_lineup_lookup_id(lineup.get("lineup_code", "")),
+        }
+        lineup_candidates.discard("")
+        return target in lineup_candidates
+
     @filter.command("洛克")
     async def rocom_help(self, event: AstrMessageEvent):
         """洛克王国帮助菜单"""
-        data = {
-            "pageTitle": "洛克王国插件",
-            "pageSubtitle": "AstrBot Roco Kingdom Data Plugin",
-            "menuGroups": [
+        menu_groups = [
                 {
                     "groupTitle": "账号管理与登录",
                     "groupSubtitle": "绑定用户信息",
@@ -815,6 +851,15 @@ class RocomPlugin(Star):
                     ]
                 }
             ]
+        if self.help_prefix_display:
+            for group in menu_groups:
+                for item in group.get("menuItems", []):
+                    item["cmd"] = f"{self.help_prefix_display}{item['cmd']}"
+
+        data = {
+            "pageTitle": "洛克王国插件",
+            "pageSubtitle": "AstrBot Roco Kingdom Data Plugin",
+            "menuGroups": menu_groups
         }
         img_url = await self.renderer.render_html("render/menu/index.html", data)
         if img_url:
@@ -852,7 +897,12 @@ class RocomPlugin(Star):
             "bind_time": int(time.time() * 1000),
             "is_primary": True
         }
-        await self.user_mgr.add_binding(user_id, binding)
+        replace_result = await self.user_mgr.replace_binding_for_role(user_id, binding)
+        removed_count = int(replace_result.get("removed_count", 0))
+        if removed_count > 0:
+            logger.info(
+                f"[Rocom] 重新登录检测到相同 UID={binding['role_id']} 的旧绑定，已清理 {removed_count} 条旧记录后写入新凭证"
+            )
         yield event.plain_result(f"✅ 绑定成功！当前账号：{binding['nickname']} (ID: {binding['role_id']})")
 
     async def _not_logged_in_hint(self, event: AstrMessageEvent):
@@ -1521,7 +1571,10 @@ class RocomPlugin(Star):
         if not results:
             yield event.plain_result(f'未找到与“{name}”相关的技能 wiki。')
             return
-        if len(results) > 1:
+        exact_match = self._find_exact_skill_match(results, name)
+        if exact_match:
+            results = [exact_match]
+        elif len(results) > 1:
             names = "、".join([item.get("name", "") for item in results[:8]])
             yield event.plain_result(
                 f"找到多个结果：{names}\n请使用更精确的技能名称重新查询。"
@@ -1669,6 +1722,10 @@ class RocomPlugin(Star):
         if not lineup_id:
             yield event.plain_result("请提供阵容码。用法：/查看阵容 <阵容码>")
             return
+        lineup_id = self._normalize_lineup_lookup_id(lineup_id)
+        if not lineup_id:
+            yield event.plain_result("请提供有效的阵容码。用法：/查看阵容 <阵容码>")
+            return
             
         fw_token = await self._get_primary_token(event)
         if not fw_token:
@@ -1685,7 +1742,7 @@ class RocomPlugin(Star):
         # 查找匹配的阵容
         target_lineup = None
         for lineup in res.get("lineups", []):
-            if str(lineup.get("id", "")) == lineup_id:
+            if self._is_target_lineup(lineup, lineup_id):
                 target_lineup = lineup
                 break
         
@@ -1696,7 +1753,7 @@ class RocomPlugin(Star):
                 res = await self.client.get_lineup_list(fw_token, page_no=page)
                 if res and "lineups" in res:
                     for lineup in res.get("lineups", []):
-                        if str(lineup.get("id", "")) == lineup_id:
+                        if self._is_target_lineup(lineup, lineup_id):
                             target_lineup = lineup
                             break
                 if target_lineup:
@@ -1713,7 +1770,13 @@ class RocomPlugin(Star):
             pet_data = {
                 "pet_name": pet.get("pet_name", ""),
                 "pet_img_url": pet.get("pet_img_url", ""),
-                "skills": [skill.get("skill_img_url", "") for skill in pet.get("skills_info", [])],
+                "skills": [
+                    {
+                        "icon": skill.get("skill_img_url", ""),
+                        "name": skill.get("skill_name", ""),
+                    }
+                    for skill in pet.get("skills_info", [])
+                ],
                 "bloodline": pet.get("bloodline_info") is not None,
                 "bloodline_icon": pet.get("bloodline_info", {}).get("icon", "") if pet.get("bloodline_info") else ""
             }

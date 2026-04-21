@@ -12,7 +12,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=45B7D1)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/issues)
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-FFc65f?style=for-the-badge\&logo=python)](https://github.com/Soulter/AstrBot)
 
-### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.2.1
+### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.3.0
 
 ### 扫码绑定 · 个人档案 · 最近战绩 · 精灵背包 · 阵容助手
 
@@ -239,6 +239,27 @@ astrbot_plugin_rocom/
 
 <details>
 <summary>点击展开版本历史</summary>
+
+### v2.3.0 (2026-04-21)
+
+**新增**
+- 新增 `help_prefix_display` 配置项，可仅对帮助菜单图片中的命令展示前缀做替换
+
+**优化**
+- 调整查看阵容详情渲染，补充技能名称展示并优化技能区与头像区布局
+
+**修复**
+- 修复 `查看阵容` 指令对阵容码的匹配逻辑，兼容更稳定的阵容码查找
+- 修复技能 wiki 在存在精确同名项时仍被模糊结果拦截的问题
+- 修复相同 UID 重新登录时旧绑定残留导致的新旧 token 数据混用问题
+
+### v2.2.2 (2026-04-21)
+
+**新增**
+- 新增 `help_prefix_display` 配置项，仅用于帮助菜单图片中的命令前缀展示
+
+**修复**
+- 重新登录识别到相同 UID 时，会先清理旧绑定数据再写入新 token，避免旧状态残留或数据混用
 
 ### v2.2.1 (2026-04-20)
 

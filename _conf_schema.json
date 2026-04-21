@@ -2,7 +2,7 @@
   "wegame_api_key": {
     "type": "string",
     "description": "WeGame API Key",
-    "hint": "用于访问 WeGame作用域 API 的开发者密钥，前往xxxx获取（前端待补全，目前请使用公用key）",
+    "hint": "用于访问 WeGame API 的开发者密钥",
     "default": ""
   },
   "api_base_url": {
@@ -16,6 +16,12 @@
     "description": "渲染超时时间",
     "hint": "图片渲染最大等待时间（毫秒）",
     "default": 30000
+  },
+  "help_prefix_display": {
+    "type": "string",
+    "description": "菜单页指令展示前缀",
+    "hint": "仅用于帮助菜单图片中的命令展示，不影响实际命令注册；例如填写 9 后显示为 9洛克",
+    "default": ""
   },
   "auto_refresh_enabled": {
     "type": "bool",
