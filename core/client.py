@@ -64,13 +64,17 @@ class RocomClient:
         cleaned = re.sub(r'[^a-zA-Z0-9_\- \u4e00-\u9fa5]', '', uid)
         return cleaned.strip()
 
-    def _rocom_headers(self, fw_token: str) -> Dict[str, str]:
+    def _rocom_headers(
+        self, fw_token: str, user_identifier: str = ""
+    ) -> Dict[str, str]:
         """游戏数据查询接口的请求头 (scope=game:rocom)"""
         headers = {
             "X-Framework-Token": fw_token
         }
         if self.wegame_api_key:
             headers["X-API-Key"] = self.wegame_api_key
+        if user_identifier:
+            headers["X-User-Identifier"] = self._sanitize_uid(user_identifier)
         return headers
 
     async def _get(
@@ -86,11 +90,13 @@ class RocomClient:
             # 检查响应状态码
             if resp.status_code != 200:
                 logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code}")
+                self._set_last_error(f"HTTP {resp.status_code}")
                 return None
             
             # 检查响应内容是否为空
             if not resp.text or not resp.text.strip():
                 logger.warning(f"[Rocom API] {path} 响应为空")
+                self._set_last_error("响应为空")
                 return None
             
             # 安全解析 JSON
@@ -98,20 +104,26 @@ class RocomClient:
                 data = resp.json()
             except Exception as json_err:
                 logger.warning(f"[Rocom API] {path} JSON 解析失败: {json_err}, 响应内容: {resp.text[:200]}")
+                self._set_last_error("JSON 解析失败")
                 return None
             
             if data.get("code") != 0:
-                logger.warning(f"[Rocom API] {path} 错误: {data.get('message', '未知')}")
+                err_message = data.get("message", "未知")
+                logger.warning(f"[Rocom API] {path} 错误: {err_message}")
+                self._set_last_error(str(err_message))
                 return None
             return data.get("data", {})
         except httpx.TimeoutException:
             logger.error(f"[Rocom API] GET {path} 请求超时")
+            self._set_last_error("请求超时")
             return None
         except httpx.RequestError as e:
             logger.error(f"[Rocom API] GET {path} 请求失败: {e}")
+            self._set_last_error(f"请求失败: {e}")
             return None
         except Exception as e:
             logger.error(f"[Rocom API] GET {path} 异常: {e}")
+            self._set_last_error(f"异常: {e}")
             return None
 
     async def _post(
@@ -122,6 +134,7 @@ class RocomClient:
         params: Optional[Dict] = None,
     ) -> Optional[Dict]:
         try:
+            self._clear_last_error()
             client = await self._get_client()
             resp = await client.post(
                 f"{self.base_url}{path}",
@@ -133,11 +146,13 @@ class RocomClient:
             # 检查响应状态码
             if resp.status_code != 200:
                 logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code}")
+                self._set_last_error(f"HTTP {resp.status_code}")
                 return None
             
             # 检查响应内容是否为空
             if not resp.text or not resp.text.strip():
                 logger.warning(f"[Rocom API] {path} 响应为空")
+                self._set_last_error("响应为空")
                 return None
             
             # 安全解析 JSON
@@ -145,37 +160,46 @@ class RocomClient:
                 data = resp.json()
             except Exception as json_err:
                 logger.warning(f"[Rocom API] {path} JSON 解析失败: {json_err}, 响应内容: {resp.text[:200]}")
+                self._set_last_error("JSON 解析失败")
                 return None
             
             if data.get("code") != 0:
-                logger.warning(f"[Rocom API] {path} 错误: {data.get('message', '未知')}")
+                err_message = data.get("message", "未知")
+                logger.warning(f"[Rocom API] {path} 错误: {err_message}")
+                self._set_last_error(str(err_message))
                 return None
             return data.get("data", {})
         except httpx.TimeoutException:
             logger.error(f"[Rocom API] POST {path} 请求超时")
+            self._set_last_error("请求超时")
             return None
         except httpx.RequestError as e:
             logger.error(f"[Rocom API] POST {path} 请求失败: {e}")
+            self._set_last_error(f"请求失败: {e}")
             return None
         except Exception as e:
             logger.error(f"[Rocom API] POST {path} 异常: {e}")
+            self._set_last_error(f"异常: {e}")
             return None
 
     async def _delete(
         self, path: str, headers: Dict[str, str]
     ) -> Optional[Dict]:
         try:
+            self._clear_last_error()
             client = await self._get_client()
             resp = await client.delete(f"{self.base_url}{path}", headers=headers)
             
             # 检查响应状态码
             if resp.status_code != 200:
                 logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code}")
+                self._set_last_error(f"HTTP {resp.status_code}")
                 return None
             
             # 检查响应内容是否为空
             if not resp.text or not resp.text.strip():
                 logger.warning(f"[Rocom API] {path} 响应为空")
+                self._set_last_error("响应为空")
                 return None
             
             # 安全解析 JSON
@@ -183,20 +207,26 @@ class RocomClient:
                 data = resp.json()
             except Exception as json_err:
                 logger.warning(f"[Rocom API] {path} JSON 解析失败: {json_err}, 响应内容: {resp.text[:200]}")
+                self._set_last_error("JSON 解析失败")
                 return None
             
             if data.get("code") != 0:
-                logger.warning(f"[Rocom API] {path} 错误: {data.get('message', '未知')}")
+                err_message = data.get("message", "未知")
+                logger.warning(f"[Rocom API] {path} 错误: {err_message}")
+                self._set_last_error(str(err_message))
                 return None
             return data.get("data", {})
         except httpx.TimeoutException:
             logger.error(f"[Rocom API] DELETE {path} 请求超时")
+            self._set_last_error("请求超时")
             return None
         except httpx.RequestError as e:
             logger.error(f"[Rocom API] DELETE {path} 请求失败: {e}")
+            self._set_last_error(f"请求失败: {e}")
             return None
         except Exception as e:
             logger.error(f"[Rocom API] DELETE {path} 异常: {e}")
+            self._set_last_error(f"异常: {e}")
             return None
 
     # ─── 登录相关 ───
@@ -361,7 +391,7 @@ class RocomClient:
     # ─── 洛克王国游戏数据 ───
 
     async def get_role(
-        self, fw_token: str, account_type: int | None = None
+        self, fw_token: str, account_type: int | None = None, user_identifier: str = ""
     ) -> Optional[Dict]:
         """角色资料"""
         params = {}
@@ -369,12 +399,12 @@ class RocomClient:
             params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/profile/role",
-            self._rocom_headers(fw_token),
+            self._rocom_headers(fw_token, user_identifier),
             params=params,
         )
 
     async def get_evaluation(
-        self, fw_token: str, account_type: int | None = None
+        self, fw_token: str, account_type: int | None = None, user_identifier: str = ""
     ) -> Optional[Dict]:
         """AI 维度评价"""
         params = {}
@@ -382,12 +412,12 @@ class RocomClient:
             params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/profile/evaluation",
-            self._rocom_headers(fw_token),
+            self._rocom_headers(fw_token, user_identifier),
             params=params,
         )
 
     async def get_pet_summary(
-        self, fw_token: str, account_type: int | None = None
+        self, fw_token: str, account_type: int | None = None, user_identifier: str = ""
     ) -> Optional[Dict]:
         """精灵摘要"""
         params = {}
@@ -395,12 +425,12 @@ class RocomClient:
             params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/profile/pet-summary",
-            self._rocom_headers(fw_token),
+            self._rocom_headers(fw_token, user_identifier),
             params=params,
         )
 
     async def get_collection(
-        self, fw_token: str, account_type: int | None = None
+        self, fw_token: str, account_type: int | None = None, user_identifier: str = ""
     ) -> Optional[Dict]:
         """收藏数据"""
         params = {}
@@ -408,20 +438,20 @@ class RocomClient:
             params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/profile/collection",
-            self._rocom_headers(fw_token),
+            self._rocom_headers(fw_token, user_identifier),
             params=params,
         )
 
     async def get_battle_overview(
-        self, fw_token: str, account_type: int | None = None
+        self, fw_token: str, zone: int | None = None, user_identifier: str = ""
     ) -> Optional[Dict]:
         """对战总览"""
         params = {}
-        if account_type:
-            params["account_type"] = account_type
+        if zone is not None:
+            params["zone"] = zone
         return await self._get(
             "/api/v1/games/rocom/profile/battle-overview",
-            self._rocom_headers(fw_token),
+            self._rocom_headers(fw_token, user_identifier),
             params=params,
         )
 
@@ -431,6 +461,7 @@ class RocomClient:
         page_size: int = 4,
         after_time: str = "",
         zone: int | None = None,
+        user_identifier: str = "",
     ) -> Optional[Dict]:
         """对战记录列表"""
         params: Dict[str, Any] = {"page_size": page_size}
@@ -440,7 +471,7 @@ class RocomClient:
             params["zone"] = zone
         return await self._get(
             "/api/v1/games/rocom/battle/list",
-            self._rocom_headers(fw_token),
+            self._rocom_headers(fw_token, user_identifier),
             params=params,
         )
 
@@ -451,6 +482,7 @@ class RocomClient:
         page_no: int = 1,
         page_size: int = 10,
         zone: int | None = None,
+        user_identifier: str = "",
     ) -> Optional[Dict]:
         """精灵列表"""
         params = {
@@ -462,7 +494,7 @@ class RocomClient:
             params["zone"] = zone
         return await self._get(
             "/api/v1/games/rocom/battle/pets",
-            self._rocom_headers(fw_token),
+            self._rocom_headers(fw_token, user_identifier),
             params,
         )
 
@@ -472,6 +504,7 @@ class RocomClient:
         page_no: int = 1,
         category: str = "",
         account_type: int | None = None,
+        user_identifier: str = "",
     ) -> Optional[Dict]:
         """查询阵容助手列表"""
         params = {"page_no": page_no}
@@ -481,7 +514,7 @@ class RocomClient:
             params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/lineup/list",
-            self._rocom_headers(fw_token),
+            self._rocom_headers(fw_token, user_identifier),
             params,
         )
 
@@ -491,6 +524,7 @@ class RocomClient:
         page_no: int = 1,
         refresh: bool = False,
         account_type: int | None = None,
+        user_identifier: str = "",
     ) -> Optional[Dict]:
         """查询交换大厅海报列表"""
         params = {
@@ -501,7 +535,7 @@ class RocomClient:
             params["account_type"] = account_type
         return await self._get(
             "/api/v1/games/rocom/exchange/posters",
-            self._wegame_headers(fw_token),
+            self._wegame_headers(fw_token, user_identifier=user_identifier),
             params,
         )
 
@@ -540,6 +574,76 @@ class RocomClient:
         return await self._get(
             "/api/v1/games/rocom/wiki/skill",
             self._wegame_headers(),
+            params=params,
+        )
+
+    async def ingame_player_search(self, uid: str) -> Optional[Dict]:
+        params = {"uid": uid}
+        data = await self._get(
+            "/api/v1/games/rocom/ingame/player/search",
+            self._wegame_headers(),
+            params=params,
+        )
+        if data is not None:
+            return data
+        return await self._post(
+            "/api/v1/games/rocom/ingame/player/search",
+            self._wegame_headers(),
+            json_data={"uid": uid},
+        )
+
+    async def ingame_merchant_info(self, shop_id: int | str) -> Optional[Dict]:
+        params = {"shop_id": shop_id}
+        data = await self._get(
+            "/api/v1/games/rocom/ingame/merchant/info",
+            self._wegame_headers(),
+            params=params,
+        )
+        if data is not None:
+            return data
+        return await self._post(
+            "/api/v1/games/rocom/ingame/merchant/info",
+            self._wegame_headers(),
+            json_data={"shop_id": shop_id},
+        )
+
+    async def get_friendship(
+        self, fw_token: str, user_ids: str, user_identifier: str = ""
+    ) -> Optional[Dict]:
+        params = {"user_ids": user_ids}
+        return await self._get(
+            "/api/v1/games/rocom/social/friendship",
+            self._rocom_headers(fw_token, user_identifier),
+            params=params,
+        )
+
+    async def get_student_state(
+        self, fw_token: str, account_type: int | None = None, user_identifier: str = ""
+    ) -> Optional[Dict]:
+        params: Dict[str, Any] = {}
+        if account_type is not None:
+            params["account_type"] = account_type
+        return await self._get(
+            "/api/v1/games/rocom/activity/student-state",
+            self._rocom_headers(fw_token, user_identifier),
+            params=params,
+        )
+
+    async def get_student_perks(
+        self,
+        fw_token: str,
+        area: int | None = None,
+        account_type: int | None = None,
+        user_identifier: str = "",
+    ) -> Optional[Dict]:
+        params: Dict[str, Any] = {}
+        if area is not None:
+            params["area"] = area
+        if account_type is not None:
+            params["account_type"] = account_type
+        return await self._get(
+            "/api/v1/games/rocom/activity/perks",
+            self._rocom_headers(fw_token, user_identifier),
             params=params,
         )
 
