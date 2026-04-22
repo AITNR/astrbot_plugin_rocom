@@ -4,6 +4,7 @@ import base64
 import tempfile
 import asyncio
 import re
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
@@ -18,7 +19,7 @@ from .core.user import UserManager, MerchantSubscriptionManager
 from .core.render import Renderer
 from .core.egg_service import EggService, SearchResult
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.3.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.5.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -805,6 +806,795 @@ class RocomPlugin(Star):
         lineup_candidates.discard("")
         return target in lineup_candidates
 
+    def _build_inspect_render_data(
+        self,
+        title: str,
+        subtitle: str,
+        rows: List[Dict[str, Any]] | None = None,
+        notes: List[str] | None = None,
+        payload: Dict[str, Any] | None = None,
+        show_payload: bool = False,
+        command_hint: str = "",
+    ) -> Dict[str, Any]:
+        return {
+            "title": title,
+            "subtitle": subtitle,
+            "rows": rows or [],
+            "notes": notes or [],
+            "payload_text": json.dumps(payload or {}, ensure_ascii=False, indent=2)
+            if show_payload and payload
+            else "",
+            "commandHint": command_hint,
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
+
+    def _format_json_payload(self, payload: Any) -> str:
+        try:
+            return json.dumps(payload, ensure_ascii=False, indent=2)
+        except Exception:
+            return str(payload)
+
+    def _get_user_identifier(self, event: AstrMessageEvent) -> str:
+        return str(event.get_sender_id() or "")
+
+    def _stringify_inspect_value(self, value: Any) -> str:
+        if value is None:
+            return "-"
+        if isinstance(value, bool):
+            return "是" if value else "否"
+        if isinstance(value, list):
+            if not value:
+                return "-"
+            if all(not isinstance(item, (dict, list)) for item in value):
+                return "、".join(str(item) for item in value)
+            return f"共 {len(value)} 项"
+        if isinstance(value, dict):
+            if not value:
+                return "-"
+            pairs = []
+            for k, v in list(value.items())[:4]:
+                pairs.append(f"{k}: {self._stringify_inspect_value(v)}")
+            text = " | ".join(pairs)
+            if len(value) > 4:
+                text += " | ..."
+            return text
+        return str(value)
+
+    def _flatten_payload_rows(
+        self,
+        payload: Any,
+        prefix: str = "",
+        level: int = 0,
+        max_depth: int = 3,
+    ) -> List[Dict[str, Any]]:
+        rows: List[Dict[str, Any]] = []
+        if level > max_depth:
+            return rows
+
+        if isinstance(payload, dict):
+            for key, value in payload.items():
+                label = f"{prefix}.{key}" if prefix else str(key)
+                if isinstance(value, dict):
+                    if value:
+                        rows.extend(
+                            self._flatten_payload_rows(
+                                value, prefix=label, level=level + 1, max_depth=max_depth
+                            )
+                        )
+                    else:
+                        rows.append({"label": label, "value": "-", "level": level})
+                elif isinstance(value, list):
+                    if not value:
+                        rows.append({"label": label, "value": "-", "level": level})
+                        continue
+                    if all(not isinstance(item, (dict, list)) for item in value):
+                        rows.append(
+                            {
+                                "label": label,
+                                "value": self._stringify_inspect_value(value),
+                                "level": level,
+                            }
+                        )
+                        continue
+                    for index, item in enumerate(value[:8], start=1):
+                        item_label = f"{label}[{index}]"
+                        if isinstance(item, (dict, list)):
+                            rows.extend(
+                                self._flatten_payload_rows(
+                                    item,
+                                    prefix=item_label,
+                                    level=level + 1,
+                                    max_depth=max_depth,
+                                )
+                            )
+                        else:
+                            rows.append(
+                                {
+                                    "label": item_label,
+                                    "value": self._stringify_inspect_value(item),
+                                    "level": level,
+                                }
+                            )
+                    if len(value) > 8:
+                        rows.append(
+                            {
+                                "label": label,
+                                "value": f"其余 {len(value) - 8} 项已省略",
+                                "level": level,
+                            }
+                        )
+                else:
+                    rows.append(
+                        {
+                            "label": label,
+                            "value": self._stringify_inspect_value(value),
+                            "level": level,
+                        }
+                    )
+            return rows
+
+        if isinstance(payload, list):
+            return self._flatten_payload_rows(
+                {"items": payload}, prefix=prefix, level=level, max_depth=max_depth
+            )
+
+        if prefix:
+            rows.append(
+                {
+                    "label": prefix,
+                    "value": self._stringify_inspect_value(payload),
+                    "level": level,
+                }
+            )
+        return rows
+
+    def _rows_from_response_payload(self, payload: Dict[str, Any] | None) -> List[Dict[str, Any]]:
+        if not isinstance(payload, dict):
+            return []
+        if payload.get("rows"):
+            return payload.get("rows") or []
+        return self._flatten_payload_rows(payload)
+
+    def _account_type_text(self, account_type: int) -> str:
+        return {0: "自动", 1: "QQ", 2: "微信"}.get(account_type, str(account_type))
+
+    def _friendship_status_text(self, status: Any) -> str:
+        status_map = {
+            0: "查询成功",
+            1: "状态码 1",
+            2: "状态码 2",
+            3: "状态码 3",
+        }
+        try:
+            status_int = int(status)
+        except Exception:
+            return str(status or "-")
+        return status_map.get(status_int, f"状态码 {status_int}")
+
+    def _student_perk_state_text(self, state: Any) -> str:
+        try:
+            state_int = int(state)
+        except Exception:
+            return str(state or "-")
+        return f"状态码 {state_int}"
+
+    def _student_state_code_text(self, state: Any) -> str:
+        state_map = {
+            0: "未认证",
+            1: "已认证",
+            2: "审核中",
+        }
+        try:
+            state_int = int(state)
+        except Exception:
+            return str(state or "-")
+        return state_map.get(state_int, f"状态码 {state_int}")
+
+    def _extract_scalar_items(
+        self,
+        payload: Dict[str, Any],
+        exclude_keys: set[str] | None = None,
+        label_map: Dict[str, str] | None = None,
+    ) -> List[Dict[str, str]]:
+        items: List[Dict[str, str]] = []
+        exclude_keys = exclude_keys or set()
+        label_map = label_map or {}
+        for key, value in payload.items():
+            if key in exclude_keys or isinstance(value, (dict, list)):
+                continue
+            items.append(
+                {
+                    "label": label_map.get(key, key.replace("_", " ").title()),
+                    "value": self._stringify_inspect_value(value),
+                }
+            )
+        return items
+
+    def _build_friendship_render_data(
+        self, payload: Dict[str, Any], user_ids: str
+    ) -> Dict[str, Any]:
+        result = payload.get("result") or {}
+        users = payload.get("user_list") or payload.get("userList") or []
+        user_cards = []
+        for index, user in enumerate(users, start=1):
+            status_code = user.get("status")
+            user_cards.append(
+                {
+                    "title": f"用户 {index}",
+                    "userId": str(user.get("user_id") or user.get("userId") or "-"),
+                    "statusCode": self._stringify_inspect_value(status_code),
+                    "statusText": "状态正常" if str(status_code) == "0" else self._friendship_status_text(status_code),
+                    "statusDesc": "接口已返回该用户状态，但后端当前没有提供更具体的关系类型说明。",
+                }
+            )
+
+        summary_cards = [
+            {"label": "查询对象", "value": str(len(user_cards) or len(user_ids.split(",")))},
+            {
+                "label": "接口状态",
+                "value": "成功" if result.get("error_code", 0) == 0 else "异常",
+            },
+            {
+                "label": "上游返回",
+                "value": result.get("error_message") or "OK",
+            },
+        ]
+        return {
+            "title": "好友关系",
+            "subtitle": f"查询 ID：{user_ids}",
+            "summaryCards": summary_cards,
+            "userCards": user_cards,
+            "resultCode": self._stringify_inspect_value(result.get("error_code", 0)),
+            "resultDesc": "当前接口只返回 status 字段，尚未提供“好友/非好友/黑名单”等可读关系类型。",
+            "commandHint": "💡 /洛克好友关系 <id1,id2>",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
+
+    def _build_shop_render_data(self, payload: Dict[str, Any], shop_id: str) -> Dict[str, Any]:
+        if payload.get("rows"):
+            return self._build_shop_render_data_from_rows(payload, shop_id)
+        summary_cards = []
+        detail_items = []
+        sections = []
+
+        scalar_label_map = {
+            "shop_id": "商店 ID",
+            "id": "ID",
+            "name": "名称",
+            "title": "标题",
+            "desc": "说明",
+            "description": "说明",
+            "refresh_time": "刷新时间",
+            "open_time": "开放时间",
+            "close_time": "关闭时间",
+            "currency": "货币",
+        }
+
+        for key, value in payload.items():
+            if isinstance(value, list):
+                if not value:
+                    continue
+                cards = []
+                for idx, item in enumerate(value[:24], start=1):
+                    if isinstance(item, dict):
+                        title = (
+                            item.get("name")
+                            or item.get("title")
+                            or item.get("item_name")
+                            or f"{key} #{idx}"
+                        )
+                        image = (
+                            item.get("icon")
+                            or item.get("icon_url")
+                            or item.get("image")
+                            or item.get("image_url")
+                            or ""
+                        )
+                        metas = []
+                        for mk, mv in item.items():
+                            if mk in {"name", "title", "item_name", "icon", "icon_url", "image", "image_url"}:
+                                continue
+                            if isinstance(mv, (dict, list)):
+                                continue
+                            metas.append(
+                                {
+                                    "label": scalar_label_map.get(mk, mk.replace("_", " ").title()),
+                                    "value": self._stringify_inspect_value(mv),
+                                }
+                            )
+                        cards.append(
+                            {
+                                "title": title,
+                                "image": image,
+                                "meta": metas[:6],
+                            }
+                        )
+                    else:
+                        cards.append(
+                            {
+                                "title": self._stringify_inspect_value(item),
+                                "image": "",
+                                "meta": [],
+                            }
+                        )
+                sections.append(
+                    {
+                        "title": key.replace("_", " ").title(),
+                        "cards": cards,
+                    }
+                )
+                summary_cards.append({"label": key.replace("_", " ").title(), "value": str(len(value))})
+            elif isinstance(value, dict):
+                for subk, subv in value.items():
+                    if isinstance(subv, (dict, list)):
+                        continue
+                    detail_items.append(
+                        {
+                            "label": scalar_label_map.get(subk, subk.replace("_", " ").title()),
+                            "value": self._stringify_inspect_value(subv),
+                        }
+                    )
+            else:
+                detail_items.append(
+                    {
+                        "label": scalar_label_map.get(key, key.replace("_", " ").title()),
+                        "value": self._stringify_inspect_value(value),
+                    }
+                )
+
+        if not summary_cards:
+            summary_cards = [
+                {"label": "数据字段", "value": str(len(payload))},
+                {"label": "商店 ID", "value": shop_id},
+                {"label": "列表分组", "value": str(len(sections))},
+            ]
+        else:
+            summary_cards = ([{"label": "商店 ID", "value": shop_id}] + summary_cards)[:3]
+
+        hero_title = "商店信息"
+        hero_value = next((item["value"] for item in detail_items if item["label"] in {"名称", "标题"}), shop_id)
+        hero_subvalue = f"shop_id = {shop_id}"
+
+        return {
+            "title": "洛克商店",
+            "subtitle": f"shop_id = {shop_id}",
+            "heroTitle": hero_title,
+            "heroValue": hero_value,
+            "heroSubvalue": hero_subvalue,
+            "summaryCards": summary_cards,
+            "sections": sections,
+            "detailItems": detail_items[:18],
+            "commandHint": "💡 /洛克商店 <shop_id>",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
+
+    def _build_shop_render_data_from_rows(self, payload: Dict[str, Any], shop_id: str) -> Dict[str, Any]:
+        rows = payload.get("rows") or []
+        notes = payload.get("notes") or []
+        top_level = [row for row in rows if int(row.get("level", 0) or 0) == 0]
+        nested = [row for row in rows if int(row.get("level", 0) or 0) > 0]
+
+        top_map = {str(row.get("field", "")): str(row.get("value", "")) for row in top_level}
+        summary_cards = [
+            {"label": "商店 ID", "value": top_map.get("shop_id", shop_id)},
+            {"label": "返回码", "value": top_map.get("ret_code", "-")},
+            {"label": "商品数量", "value": top_map.get("goods_count", str(len(nested) > 0))},
+        ]
+
+        current_card = {"title": f"商品 #{1}", "image": "", "meta": []}
+        cards = []
+        goods_index = 0
+        for row in nested:
+            field = str(row.get("field", ""))
+            label = row.get("label") or field
+            value = str(row.get("value", ""))
+            if field == "goods_id":
+                if current_card["meta"]:
+                    cards.append(current_card)
+                goods_index += 1
+                current_card = {
+                    "title": f"商品 #{goods_index}",
+                    "image": "",
+                    "meta": [{"label": label, "value": value}],
+                }
+            else:
+                current_card["meta"].append({"label": label, "value": value})
+        if current_card["meta"]:
+            cards.append(current_card)
+
+        detail_items = [
+            {
+                "label": row.get("label") or row.get("field") or "-",
+                "value": str(row.get("value", "")),
+            }
+            for row in top_level
+        ]
+        if notes:
+            detail_items.extend([{"label": "附加说明", "value": str(note)} for note in notes[:6]])
+
+        return {
+            "title": "洛克商店",
+            "subtitle": payload.get("title") or f"shop_id = {shop_id}",
+            "heroTitle": "商店查询",
+            "heroValue": top_map.get("shop_id", shop_id),
+            "heroSubvalue": f"商品数量 {top_map.get('goods_count', '0')}",
+            "summaryCards": summary_cards,
+            "sections": [{"title": "商品列表", "cards": cards}] if cards else [],
+            "detailItems": detail_items,
+            "commandHint": "💡 /洛克商店 <shop_id>",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
+
+    def _clean_player_field_value(self, field: str, value: str) -> str:
+        text = str(value or "").strip().strip("'")
+        if text in {"<0B>", "<0b>", "<0B >", "<0b >", ""}:
+            return "未设置"
+        if field in {"is_online", "online", "chat_top_unlock", "is_friend", "is_black", "is_black_role", "is_chat_node_unlock"}:
+            return "是" if text in {"1", "true", "True"} else "否"
+        if field in {"sex", "gender"}:
+            return {"0": "未知", "1": "男", "2": "女"}.get(text, text)
+        if field in {"friend_type"}:
+            return {"0": "默认", "1": "特殊"}.get(text, text)
+        if field == "battle_state":
+            return {"0": "空闲", "1": "对战中"}.get(text, text)
+        return text
+
+    def _parse_ingame_player_payload(self, payload: Dict[str, Any], uid: str) -> Dict[str, Any]:
+        rows = payload.get("rows") or []
+        notes = payload.get("notes") or []
+        row_map: Dict[str, str] = {}
+        label_map: Dict[str, str] = {}
+        for row in rows:
+            field = str(row.get("field", ""))
+            row_map[field] = str(row.get("value", ""))
+            label_map[field] = str(row.get("label") or row.get("field") or "")
+
+        title = payload.get("title") or "玩家搜索"
+        nickname = self._clean_player_field_value("name", row_map.get("name", "-"))
+        player_uid = self._clean_player_field_value("uin", row_map.get("uin", uid))
+        level = self._clean_player_field_value("level", row_map.get("level", "-"))
+        signature = self._clean_player_field_value("signature", row_map.get("signature", ""))
+        if signature == "未设置":
+            signature = "这个玩家还没有设置个性签名"
+        ret_code = self._clean_player_field_value("ret_code", row_map.get("ret_code", "0"))
+
+        section_defs = [
+            (
+                "基础信息",
+                [
+                    "uin",
+                    "name",
+                    "level",
+                    "gender",
+                    "online",
+                    "signature",
+                    "note",
+                    "openid",
+                    "regist_date",
+                    "last_logout_time",
+                    "world_level",
+                    "card_handbook_collect_num",
+                ],
+            ),
+            (
+                "社交关系",
+                [
+                    "is_friend",
+                    "is_black_role",
+                    "friend_type",
+                    "add_friend_time",
+                    "pinned_time",
+                    "bp_gift_grade",
+                    "cli_login_channel",
+                    "is_chat_node_unlock",
+                    "plat_nick_name",
+                ],
+            ),
+            (
+                "家园信息",
+                [
+                    "home_name",
+                    "home_experience",
+                    "home_level",
+                    "room_level",
+                    "home_comfort_level",
+                    "visitor_num",
+                ],
+            ),
+            (
+                "战斗信息",
+                [
+                    "battle_conf_id",
+                    "battle_state",
+                    "card_skin_selected",
+                    "card_icon_selected",
+                    "card_label_first_selected",
+                    "card_label_last_selected",
+                    "display_type",
+                    "scene_res_cfg_id",
+                    "camp_id",
+                ],
+            ),
+        ]
+
+        used_fields = set()
+        sections = []
+        for section_title, fields in section_defs:
+            items = []
+            for field in fields:
+                if field not in row_map:
+                    continue
+                items.append(
+                    {
+                        "label": label_map.get(field, field),
+                        "value": self._clean_player_field_value(field, row_map.get(field, "")),
+                    }
+                )
+                used_fields.add(field)
+            if items:
+                sections.append({"title": section_title, "items": items})
+
+        extra_items = []
+        skip_fields = {
+            "ret_info",
+            "player_info",
+            "battle_brief_info",
+            "home_info",
+            "start_up_privilege_info",
+            "pos_info",
+            "visit_info",
+            "ban_info",
+        }
+        for row in rows:
+            field = str(row.get("field", ""))
+            if field in used_fields or field in skip_fields:
+                continue
+            raw_value = str(row.get("value", ""))
+            if raw_value.startswith("(") and raw_value.endswith(")"):
+                continue
+            extra_items.append(
+                {
+                    "label": row.get("label") or field,
+                    "value": self._clean_player_field_value(field, raw_value),
+                }
+            )
+        if extra_items:
+            sections.append({"title": "其他信息", "items": extra_items[:12]})
+
+        note_items = [{"label": "附加说明", "value": str(note)} for note in notes[:6]]
+        return {
+            "title": title,
+            "nickname": nickname if nickname and nickname != "-" else player_uid,
+            "uid": player_uid,
+            "level": level,
+            "signature": signature,
+            "retCode": ret_code,
+            "online": self._clean_player_field_value("online", row_map.get("online", row_map.get("is_online", "0"))),
+            "sections": sections,
+            "noteItems": note_items,
+            "labelMap": label_map,
+            "rowMap": {k: self._clean_player_field_value(k, v) for k, v in row_map.items()},
+        }
+
+    def _player_field(self, parsed: Dict[str, Any] | None, field: str, default: str = "-") -> str:
+        if not parsed:
+            return default
+        row_map = parsed.get("rowMap") or {}
+        value = str(row_map.get(field, default) or default).strip()
+        return value if value else default
+
+    def _player_signature_text(self, parsed: Dict[str, Any] | None) -> str:
+        if not parsed:
+            return ""
+        text = str(parsed.get("signature") or "").strip()
+        if not text or text == "未设置":
+            return ""
+        return text
+
+    def _build_player_curated_sections(
+        self, parsed: Dict[str, Any], include_card: bool = True
+    ) -> List[Dict[str, Any]]:
+        def pack(title: str, pairs: List[tuple[str, str]]) -> Dict[str, Any] | None:
+            items = [{"label": label, "value": value} for label, value in pairs if value and value != "-" and value != "未设置"]
+            return {"title": title, "items": items} if items else None
+
+        sections = [
+            pack(
+                "核心档案",
+                [
+                    ("等级", parsed.get("level", "-")),
+                    ("在线状态", self._player_field(parsed, "online")),
+                    ("性别", self._player_field(parsed, "gender", self._player_field(parsed, "sex"))),
+                    ("世界等级", self._player_field(parsed, "world_level")),
+                    ("图鉴收集", self._player_field(parsed, "card_handbook_collect_num")),
+                    ("最后离线", self._player_field(parsed, "last_logout_time")),
+                ],
+            ),
+            pack(
+                "家园信息",
+                [
+                    ("家园名称", self._player_field(parsed, "home_name")),
+                    ("家园等级", self._player_field(parsed, "home_level")),
+                    ("家园经验", self._player_field(parsed, "home_experience")),
+                    ("舒适度", self._player_field(parsed, "home_comfort_level")),
+                    ("访客数量", self._player_field(parsed, "visitor_num")),
+                ],
+            ),
+        ]
+        if include_card:
+            sections.append(
+                pack(
+                    "名片信息",
+                    [
+                        ("名片皮肤", self._player_field(parsed, "card_skin_selected")),
+                        ("名片头像", self._player_field(parsed, "card_icon_selected")),
+                        ("首标签", self._player_field(parsed, "card_label_first_selected")),
+                        ("尾标签", self._player_field(parsed, "card_label_last_selected")),
+                    ],
+                )
+            )
+        return [section for section in sections if section]
+
+    def _build_player_search_render_data(self, payload: Dict[str, Any], uid: str) -> Dict[str, Any]:
+        parsed = self._parse_ingame_player_payload(payload, uid)
+        curated_sections = self._build_player_curated_sections(parsed, include_card=True)
+        signature = self._player_signature_text(parsed)
+        summary_cards = [
+            {"label": "等级", "value": parsed["level"]},
+            {"label": "在线状态", "value": parsed["online"]},
+            {"label": "世界等级", "value": self._player_field(parsed, "world_level")},
+            {"label": "图鉴收集", "value": self._player_field(parsed, "card_handbook_collect_num")},
+            {"label": "家园等级", "value": self._player_field(parsed, "home_level")},
+            {"label": "舒适度", "value": self._player_field(parsed, "home_comfort_level")},
+        ]
+        summary_cards = [item for item in summary_cards if item["value"] and item["value"] != "-"]
+
+        return {
+            "title": "洛克玩家",
+            "subtitle": parsed["title"],
+            "heroTitle": "玩家信息",
+            "heroValue": parsed["nickname"],
+            "heroSubvalue": f"UID {parsed['uid']} · 返回码 {parsed['retCode']}",
+            "summaryCards": summary_cards[:6],
+            "signature": signature,
+            "showSignature": bool(signature),
+            "sections": curated_sections,
+            "commandHint": "💡 /洛克玩家 <UID>",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
+
+    def _build_student_state_render_data(
+        self, payload: Dict[str, Any], account_type: int
+    ) -> Dict[str, Any]:
+        result = payload.get("result") or {}
+        certified = payload.get("certified")
+        game_certified = payload.get("game_certified")
+        school = payload.get("school") or payload.get("school_name") or "未返回"
+        summary_cards = [
+            {"label": "账号来源", "value": self._account_type_text(account_type)},
+            {
+                "label": "认证状态",
+                "value": "已认证" if str(certified) == "1" else "未认证",
+            },
+            {
+                "label": "学校信息",
+                "value": school,
+            },
+        ]
+        detail_items = [
+            {"label": "学生认证", "value": "是" if str(certified) == "1" else "否"},
+            {
+                "label": "游戏内认证",
+                "value": "是" if str(game_certified) == "1" else "否",
+            },
+            {"label": "学校", "value": school},
+            {"label": "上游状态", "value": result.get("error_message") or "WG_COMM_SUCC"},
+            {
+                "label": "上游错误码",
+                "value": self._stringify_inspect_value(result.get("error_code", 0)),
+            },
+        ]
+        return {
+            "title": "学生认证状态",
+            "subtitle": f"账号类型：{self._account_type_text(account_type)}",
+            "summaryCards": summary_cards,
+            "detailItems": detail_items,
+            "heroTitle": "学生认证",
+            "heroValue": "已通过" if str(certified) == "1" else "未认证",
+            "heroSubvalue": school,
+            "commandHint": "💡 /洛克学生 [area] [account_type]",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
+
+    def _build_student_perks_render_data(
+        self, payload: Dict[str, Any], area: int, account_type: int
+    ) -> Dict[str, Any]:
+        result = payload.get("result") or {}
+        cards = payload.get("cards") or []
+        perk_cards = []
+        for card in cards:
+            state_code = card.get("state")
+            perk_cards.append(
+                {
+                    "name": card.get("name") or f"奖励 #{card.get('id', '-')}",
+                    "count": card.get("count", 0),
+                    "desc": card.get("desc") or "暂无说明",
+                    "icon": card.get("icon") or "",
+                    "id": self._stringify_inspect_value(card.get("id")),
+                    "stateCode": self._stringify_inspect_value(state_code),
+                    "stateText": self._student_perk_state_text(state_code),
+                }
+            )
+        detail_items = self._extract_scalar_items(
+            payload,
+            exclude_keys={"cards", "result"},
+            label_map={
+                "area": "大区",
+                "account_type": "账号类型",
+                "activity_name": "活动名称",
+                "activity_desc": "活动说明",
+                "desc": "活动说明",
+            },
+        )
+        return {
+            "title": "学生活动福利",
+            "subtitle": f"大区：{area}  账号类型：{self._account_type_text(account_type)}",
+            "summaryCards": [
+                {"label": "奖励数量", "value": str(len(perk_cards))},
+                {"label": "账号来源", "value": self._account_type_text(account_type)},
+                {"label": "上游状态", "value": result.get("error_message") or "WG_COMM_SUCC"},
+            ],
+            "perkCards": perk_cards,
+            "detailItems": detail_items,
+            "heroTitle": "学生活动奖励",
+            "heroValue": str(len(perk_cards)),
+            "heroSubvalue": "当前返回奖励项",
+            "commandHint": "💡 /洛克学生 [area] [account_type]",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
+
+    def _build_student_render_data(
+        self,
+        state_payload: Dict[str, Any],
+        perks_payload: Dict[str, Any],
+        area: int,
+        account_type: int,
+    ) -> Dict[str, Any]:
+        state_data = self._build_student_state_render_data(state_payload, account_type)
+        perks_data = self._build_student_perks_render_data(
+            perks_payload, area, account_type
+        )
+        state_result = state_payload.get("result") or {}
+        perks_result = perks_payload.get("result") or {}
+        return {
+            "title": "洛克学生",
+            "subtitle": f"大区：{area}  账号类型：{self._account_type_text(account_type)}",
+            "heroTitle": "学生信息总览",
+            "heroValue": state_data.get("heroValue", "未认证"),
+            "heroSubvalue": state_data.get("heroSubvalue", "未返回"),
+            "summaryCards": [
+                {
+                    "label": "认证状态",
+                    "value": state_data.get("heroValue", "未认证"),
+                },
+                {
+                    "label": "学校",
+                    "value": state_data.get("heroSubvalue", "未返回"),
+                },
+                {
+                    "label": "奖励数量",
+                    "value": str(len(perks_data.get("perkCards") or [])),
+                },
+            ],
+            "stateItems": state_data.get("detailItems") or [],
+            "perkCards": perks_data.get("perkCards") or [],
+            "detailItems": perks_data.get("detailItems") or [],
+            "stateResult": state_result.get("error_message") or "WG_COMM_SUCC",
+            "perksResult": perks_result.get("error_message") or "WG_COMM_SUCC",
+            "commandHint": "💡 /洛克学生 [area] [account_type]",
+            "copyright": "AstrBot & WeGame Locke Kingdom Plugin",
+        }
+
     @filter.command("洛克")
     async def rocom_help(self, event: AstrMessageEvent):
         """洛克王国帮助菜单"""
@@ -823,7 +1613,7 @@ class RocomPlugin(Star):
                 },
                 {
                     "groupTitle": "数据查询",
-                    "groupSubtitle": "查询推送服务",
+                    "groupSubtitle": "查询推送服务（含实验性/暂不可用功能）",
                     "menuItems": [
                         {"cmd": "洛克档案", "desc": "生成个人数据名片"},
                         {"cmd": "洛克战绩 <页码>", "desc": "查询并展示近期的对战场次记录"},
@@ -831,10 +1621,14 @@ class RocomPlugin(Star):
                         {"cmd": "洛克阵容 <分类> <页码>", "desc": "查看阵容助手推荐阵容 (参数可交换)"},
                         {"cmd": "洛克交换大厅 <页码>", "desc": "查看交换大厅海报 (支持别名：洛克大厅/交换大厅)"},
                         {"cmd": "远行商人", "desc": "查看当前轮次远行商人商品"},
-                        {"cmd": "订阅远行商人 [1/0] [商品...]", "desc": "群主/群管/bot管理可配置本群订阅商品，不填商品则用默认配置"},
+                        {"cmd": "洛克商店 <shop_id>", "desc": "实验性：查询商店信息，接口返回暂不稳定"},
+                        {"cmd": "洛克玩家 <UID>", "desc": "通过 ingame 接口查询玩家基础信息，当前推荐优先使用"},
+                        {"cmd": "订阅远行商人 1/0 [商品 商品]", "desc": "群主/群管/bot管理可配置本群订阅商品，不填商品则用默认配置"},
                         {"cmd": "取消订阅远行商人", "desc": "关闭当前群远行商人订阅"},
-                        {"cmd": "洛克wiki <精灵名>", "desc": "查询精灵 wiki"},
-                        {"cmd": "洛克技能 <技能名>", "desc": "查询技能 wiki"},
+                        {"cmd": "洛克好友关系 <id1,id2>", "desc": "实验性：仅返回有限状态字段，关系说明暂不稳定（需登录）"},
+                        {"cmd": "洛克学生", "desc": "实验性：接口信息量有限，当前仅供测试查看（需登录）"},
+                        {"cmd": "洛克wiki <精灵名>", "desc": "暂不可用：接口暂时关闭，当前仅返回提示"},
+                        {"cmd": "洛克技能 <技能名>", "desc": "暂不可用：接口暂时关闭，当前仅返回提示"},
                         {"cmd": "洛克查蛋 <精灵名>", "desc": "查询精灵蛋组及可配种精灵 (支持别名：查蛋)"},
                         {"cmd": "洛克查蛋 25 1.5", "desc": "按身高和体重反查精灵，双参数优先使用后端尺寸查询"},
                         {"cmd": "洛克配种 <精灵A> <精灵B>", "desc": "判断两只精灵能否配种 (支持别名：配种)"}
@@ -875,7 +1669,7 @@ class RocomPlugin(Star):
             return
         
         yield event.plain_result("绑定成功，正在获取角色信息...")
-        role_res = await self.client.get_role(fw_token)
+        role_res = await self.client.get_role(fw_token, user_identifier=self._get_user_identifier(event))
         
         # 检查角色信息获取是否成功
         if not role_res or not role_res.get("role"):
@@ -1180,7 +1974,7 @@ class RocomPlugin(Star):
                         await self.user_mgr.remove_binding_by_id(user_id, binding_id)
                     continue
 
-                role_res = await self.client.get_role(fw_token)
+                role_res = await self.client.get_role(fw_token, user_identifier=str(user_id))
                 if role_res and isinstance(role_res, dict) and role_res.get("role"):
                     valid_bindings.append(binding)
                 else:
@@ -1222,12 +2016,13 @@ class RocomPlugin(Star):
 
         yield event.plain_result("正在获取洛克王国数据...")
         
-        role_task = self.client.get_role(fw_token)
-        eval_task = self.client.get_evaluation(fw_token)
-        sum_task = self.client.get_pet_summary(fw_token)
-        coll_task = self.client.get_collection(fw_token)
-        battle_overview_task = self.client.get_battle_overview(fw_token)
-        battle_list_task = self.client.get_battle_list(fw_token, page_size=1)
+        user_identifier = self._get_user_identifier(event)
+        role_task = self.client.get_role(fw_token, user_identifier=user_identifier)
+        eval_task = self.client.get_evaluation(fw_token, user_identifier=user_identifier)
+        sum_task = self.client.get_pet_summary(fw_token, user_identifier=user_identifier)
+        coll_task = self.client.get_collection(fw_token, user_identifier=user_identifier)
+        battle_overview_task = self.client.get_battle_overview(fw_token, user_identifier=user_identifier)
+        battle_list_task = self.client.get_battle_list(fw_token, page_size=1, user_identifier=user_identifier)
         
         results = await asyncio.gather(role_task, eval_task, sum_task, coll_task, battle_overview_task, battle_list_task, return_exceptions=True)
         role_res, eval_res, sum_res, coll_res, bo_res, bl_res = results
@@ -1246,6 +2041,57 @@ class RocomPlugin(Star):
         sm = sum_res if isinstance(sum_res, dict) else {}
         cl = coll_res if isinstance(coll_res, dict) else {}
         bo = bo_res if isinstance(bo_res, dict) else {}
+        if not sm:
+            logger.warning("[Rocom] 洛克档案：pet-summary 接口不可用，已降级为基础档案渲染")
+        if not ev:
+            logger.warning("[Rocom] 洛克档案：evaluation 接口不可用，已降级为基础档案渲染")
+        if not cl:
+            logger.warning("[Rocom] 洛克档案：collection 接口不可用，已降级为基础档案渲染")
+        if not bo:
+            logger.warning("[Rocom] 洛克档案：battle-overview 接口不可用，已降级为基础档案渲染")
+        player_search_res = await self.client.ingame_player_search(role.get("id", "")) if role.get("id") else None
+        player_search_data = (
+            self._parse_ingame_player_payload(player_search_res, str(role.get("id", "")))
+            if player_search_res
+            else None
+        )
+        profile_signature = self._player_signature_text(player_search_data) if player_search_data else ""
+        profile_head_tags = []
+        profile_home_items = []
+        profile_card_items = []
+        profile_card_image = ""
+        if player_search_data:
+            tag_pairs = [
+                ("在线", self._player_field(player_search_data, "online")),
+                ("性别", self._player_field(player_search_data, "gender", self._player_field(player_search_data, "sex"))),
+                ("世界等级", self._player_field(player_search_data, "world_level")),
+                ("家园等级", self._player_field(player_search_data, "home_level")),
+            ]
+            profile_head_tags = [
+                {"label": label, "value": value}
+                for label, value in tag_pairs
+                if value and value != "-" and value != "未设置"
+            ][:4]
+            profile_home_items = [
+                {"label": label, "value": value}
+                for label, value in [
+                    ("家园名称", self._player_field(player_search_data, "home_name")),
+                    ("家园等级", self._player_field(player_search_data, "home_level")),
+                    ("家园经验", self._player_field(player_search_data, "home_experience")),
+                    ("舒适度", self._player_field(player_search_data, "home_comfort_level")),
+                    ("访客数量", self._player_field(player_search_data, "visitor_num")),
+                ]
+                if value and value != "-" and value != "未设置"
+            ]
+            profile_card_items = [
+                {"label": label, "value": value}
+                for label, value in [
+                    ("名片皮肤", self._player_field(player_search_data, "card_skin_selected")),
+                    ("名片头像", self._player_field(player_search_data, "card_icon_selected")),
+                ]
+                if value and value != "-" and value != "未设置"
+            ]
+            profile_card_image = self._player_field(player_search_data, "card_bussiness_card_url", "")
         
         # 组装数据
         data = {
@@ -1284,6 +2130,15 @@ class RocomPlugin(Star):
             "collectionHint": "查看精灵收集详情",
             "fashionCollectionCount": cl.get("fashion_collection_count", 0),
             "itemCount": cl.get("item_count", 0),
+            "hasExtraProfileData": bool(profile_signature or profile_home_items or profile_card_items or profile_card_image),
+            "profileSignature": profile_signature,
+            "showProfileSignature": bool(profile_signature),
+            "profileHeadTags": profile_head_tags,
+            "profileHomeItems": profile_home_items,
+            "profileCardItems": profile_card_items,
+            "profileCardImage": profile_card_image,
+            "profileStatusText": self._player_field(player_search_data, "online", "未知"),
+            "profileStatusClass": "online" if self._player_field(player_search_data, "online", "未知") == "是" else "offline",
             
             "hasBattleData": bo.get("total_match", 0) > 0,
             "tierBadgeUrl": bo.get("tier_icon_url", ""),
@@ -1318,17 +2173,17 @@ class RocomPlugin(Star):
         data["radarAreaPoints"] = f"{p1[0]},{p1[1]} {p2[0]},{p2[1]} {p3[0]},{p3[1]} {p4[0]},{p4[1]}"
         
         data["radarAxisLabels"] = [
-            {"x": 130, "y": 20, "anchor": "middle", "name": "战力"},
-            {"x": 240, "y": 135, "anchor": "start", "name": "收藏"},
-            {"x": 130, "y": 250, "anchor": "middle", "name": "捉定" if "capture" in ev else "未知"},
-            {"x": 20, "y": 135, "anchor": "end", "name": "推进"}
+            {"x": 130, "y": 18, "anchor": "middle", "name": "战力"},
+            {"x": 246, "y": 136, "anchor": "start", "name": "收藏"},
+            {"x": 130, "y": 246, "anchor": "middle", "name": "捕捉" if "capture" in ev else "未知"},
+            {"x": 14, "y": 136, "anchor": "end", "name": "推进"}
         ]
         
         data["radarValueBadges"] = [
-            {"x": 105, "y": 42, "width": 50, "value": ev.get("strength", 0)},
-            {"x": 195, "y": 118, "width": 50, "value": ev.get("collection", 0)},
-            {"x": 105, "y": 178, "width": 50, "value": ev.get("capture", 0)},
-            {"x": 15, "y": 118, "width": 50, "value": ev.get("progression", 0)}
+            {"x": 105, "y": 38, "width": 50, "value": ev.get("strength", 0)},
+            {"x": 190, "y": 116, "width": 50, "value": ev.get("collection", 0)},
+            {"x": 105, "y": 186, "width": 50, "value": ev.get("capture", 0)},
+            {"x": 20, "y": 116, "width": 50, "value": ev.get("progression", 0)}
         ]
         
         data["radarDots"] = [
@@ -1368,10 +2223,11 @@ class RocomPlugin(Star):
         
         # 简易实现分页，因为没有 after_time 无法随机跳转，只能支持当前只拉一页或者固定N条
         # 此处按原文档只作为战绩展示，我们就展示最近一页
+        user_identifier = self._get_user_identifier(event)
         results = await asyncio.gather(
-            self.client.get_role(fw_token),
-            self.client.get_battle_overview(fw_token),
-            self.client.get_battle_list(fw_token, page_size=4),
+            self.client.get_role(fw_token, user_identifier=user_identifier),
+            self.client.get_battle_overview(fw_token, user_identifier=user_identifier),
+            self.client.get_battle_list(fw_token, page_size=4, user_identifier=user_identifier),
             return_exceptions=True
         )
         role_res, bo_res, bl_res = results
@@ -1467,8 +2323,11 @@ class RocomPlugin(Star):
         # 统一生成指令提示 (支持参数乱序)
         hint_str = "💡 /洛克背包 <全部/异色/了不起/炫彩> <页码> | 参数可交换位置，默认：全部第1页"
         
-        role_res = await self.client.get_role(fw_token)
-        pet_res = await self.client.get_pets(fw_token, pet_subset=pet_subset, page_no=page_no, page_size=10)
+        user_identifier = self._get_user_identifier(event)
+        role_res = await self.client.get_role(fw_token, user_identifier=user_identifier)
+        pet_res = await self.client.get_pets(
+            fw_token, pet_subset=pet_subset, page_no=page_no, page_size=10, user_identifier=user_identifier
+        )
         
         if not role_res or "role" not in role_res or not pet_res or "pets" not in pet_res:
             err_msg = role_res.get("message") if isinstance(role_res, dict) and role_res.get("message") else (pet_res.get("message") if isinstance(pet_res, dict) else "接口异常")
@@ -1542,53 +2401,20 @@ class RocomPlugin(Star):
     @filter.command("洛克wiki")
     async def rocom_wiki(self, event: AstrMessageEvent, name: str = "焰火"):
         """查询精灵 wiki"""
-        res = await self.client.search_wiki_pet(name, limit=10)
-        results = (res or {}).get("results") or []
-        if not results:
-            yield event.plain_result(f"未找到与“{name}”相关的精灵 wiki。")
-            return
-        if len(results) > 1:
-            names = "、".join(
-                [f"{item.get('name', '')}{item.get('form', '')}".strip() for item in results[:8]]
-            )
-            yield event.plain_result(f"找到多个结果：{names}\n请使用更精确的名称重新查询。")
-            return
-
-        data = self._build_wiki_render_data(results[0], name)
-        img_url = await self.renderer.render_html("render/pet-wiki/index.html", data)
-        if img_url:
-            yield event.image_result(img_url)
-        else:
-            yield event.plain_result(
-                f"{data['name']} | NO.{data['number']}\n特性：{results[0].get('ability_name', '暂无')}\n链接：{results[0].get('url', '')}"
-            )
+        yield event.plain_result(
+            f"洛克 wiki 接口当前已在新版后端文档中暂时关闭，插件侧已暂停调用。\n"
+            f"你查询的是：{name}\n"
+            f"待后端重新开放后会恢复该功能。"
+        )
 
     @filter.command("洛克技能", alias={"技能 wiki"})
     async def rocom_skill(self, event: AstrMessageEvent, name: str = "圣光斩"):
         """查询技能 wiki"""
-        res = await self.client.search_wiki_skill(name, limit=10)
-        results = (res or {}).get("results") or []
-        if not results:
-            yield event.plain_result(f'未找到与“{name}”相关的技能 wiki。')
-            return
-        exact_match = self._find_exact_skill_match(results, name)
-        if exact_match:
-            results = [exact_match]
-        elif len(results) > 1:
-            names = "、".join([item.get("name", "") for item in results[:8]])
-            yield event.plain_result(
-                f"找到多个结果：{names}\n请使用更精确的技能名称重新查询。"
-            )
-            return
-
-        data = self._build_skill_render_data(results[0], name)
-        img_url = await self.renderer.render_html("render/skill-wiki/index.html", data)
-        if img_url:
-            yield event.image_result(img_url)
-        else:
-            yield event.plain_result(
-                f"{data['name']} | {data['attribute']} | {data['category']}\nPP: {data['cost']} | Power: {data['power']}\n{data['description']}"
-            )
+        yield event.plain_result(
+            f"技能 wiki 接口当前已在新版后端文档中暂时关闭，插件侧已暂停调用。\n"
+            f"你查询的是：{name}\n"
+            f"待后端重新开放后会恢复该功能。"
+        )
 
     @filter.command("远行商人")
     async def rocom_merchant(self, event: AstrMessageEvent):
@@ -1604,6 +2430,114 @@ class RocomPlugin(Star):
         yield event.plain_result(
             f"远行商人当前商品：{names}\n当前轮次：{round_info['current'] or '未开放'}\n剩余：{round_info['countdown']}"
         )
+
+    @filter.command("洛克玩家")
+    async def rocom_player_search(self, event: AstrMessageEvent, uid: str = ""):
+        """通过 ingame 接口搜索玩家"""
+        uid = str(uid or "").strip()
+        if not uid:
+            yield event.plain_result("请提供玩家 UID。用法：/洛克玩家 <UID>")
+            return
+        res = await self.client.ingame_player_search(uid)
+        if not res:
+            yield event.plain_result(f"玩家搜索失败：{self.client.get_last_error()}")
+            return
+        data = self._build_player_search_render_data(res, uid)
+        img_url = await self.renderer.render_html("render/player-search/index.html", data)
+        if img_url:
+            yield event.image_result(img_url)
+        else:
+            yield event.plain_result(self._format_json_payload(res))
+
+    @filter.command("洛克商店")
+    async def rocom_ingame_shop(self, event: AstrMessageEvent, shop_id: str = "3019"):
+        """通过 ingame 接口查询商店信息"""
+        shop_id = str(shop_id or "").strip()
+        if not shop_id:
+            yield event.plain_result("请提供商店 ID。用法：/洛克商店 <shop_id>")
+            return
+        res = await self.client.ingame_merchant_info(shop_id)
+        if not res:
+            yield event.plain_result(f"商店查询失败：{self.client.get_last_error()}")
+            return
+        data = self._build_shop_render_data(res, shop_id)
+        img_url = await self.renderer.render_html("render/ingame-shop/index.html", data)
+        if img_url:
+            yield event.image_result(img_url)
+        else:
+            yield event.plain_result(self._format_json_payload(res))
+
+    @filter.command("洛克好友关系")
+    async def rocom_friendship(self, event: AstrMessageEvent, user_ids: str = ""):
+        """查询好友关系"""
+        user_ids = str(user_ids or "").strip()
+        if not user_ids:
+            yield event.plain_result("请提供要查询的用户 ID 列表。用法：/洛克好友关系 <id1,id2>")
+            return
+        fw_token = await self._get_primary_token(event)
+        if not fw_token:
+            async for res in self._not_logged_in_hint(event):
+                yield res
+            return
+        res = await self.client.get_friendship(
+            fw_token, user_ids, user_identifier=self._get_user_identifier(event)
+        )
+        if not res:
+            yield event.plain_result(f"好友关系查询失败：{self.client.get_last_error()}")
+            return
+        data = self._build_friendship_render_data(res, user_ids)
+        img_url = await self.renderer.render_html("render/friendship/index.html", data)
+        if img_url:
+            yield event.image_result(img_url)
+        else:
+            yield event.plain_result(self._format_json_payload(res))
+
+    @filter.command("洛克学生")
+    async def rocom_student(self, event: AstrMessageEvent, arg1: str = "101", arg2: str = "0"):
+        """查询学生认证状态与学生活动福利"""
+        fw_token = await self._get_primary_token(event)
+        if not fw_token:
+            async for res in self._not_logged_in_hint(event):
+                yield res
+            return
+        try:
+            area = int(arg1)
+        except ValueError:
+            area = 101
+        try:
+            account_type = int(arg2)
+        except ValueError:
+            account_type = 0
+        user_identifier = self._get_user_identifier(event)
+        state_res, perks_res = await asyncio.gather(
+            self.client.get_student_state(
+                fw_token,
+                account_type=account_type,
+                user_identifier=user_identifier,
+            ),
+            self.client.get_student_perks(
+                fw_token,
+                area=area,
+                account_type=account_type,
+                user_identifier=user_identifier,
+            ),
+        )
+        if not state_res:
+            yield event.plain_result(f"学生认证状态查询失败：{self.client.get_last_error()}")
+            return
+        if not perks_res:
+            yield event.plain_result(f"学生活动福利查询失败：{self.client.get_last_error()}")
+            return
+        data = self._build_student_render_data(state_res, perks_res, area, account_type)
+        img_url = await self.renderer.render_html("render/student/index.html", data)
+        if img_url:
+            yield event.image_result(img_url)
+        else:
+            yield event.plain_result(
+                self._format_json_payload(
+                    {"student_state": state_res, "student_perks": perks_res}
+                )
+            )
 
     @filter.command("订阅远行商人")
     async def subscribe_merchant(self, event: AstrMessageEvent, args: str = ""):
@@ -1677,7 +2611,9 @@ class RocomPlugin(Star):
         page_no = max(page_no, 1)
             
         try:
-            res = await self.client.get_exchange_posters(fw_token, page_no=page_no)
+            res = await self.client.get_exchange_posters(
+                fw_token, page_no=page_no, user_identifier=self._get_user_identifier(event)
+            )
             if not res or "posters" not in res:
                 err_msg = res.get("message") if isinstance(res, dict) else "数据结构异常"
                 yield event.plain_result(f"获取交换大厅数据失败：{err_msg}")
@@ -1734,7 +2670,8 @@ class RocomPlugin(Star):
             return
         
         # 先获取阵容列表，找到对应 ID 的阵容
-        res = await self.client.get_lineup_list(fw_token, page_no=1)
+        user_identifier = self._get_user_identifier(event)
+        res = await self.client.get_lineup_list(fw_token, page_no=1, user_identifier=user_identifier)
         if not res or "lineups" not in res:
             yield event.plain_result("获取阵容数据失败。")
             return
@@ -1750,7 +2687,9 @@ class RocomPlugin(Star):
         if not target_lineup:
             total_pages = res.get("total_pages", 1)
             for page in range(2, min(total_pages + 1, 10)):  # 最多查找前 10 页
-                res = await self.client.get_lineup_list(fw_token, page_no=page)
+                res = await self.client.get_lineup_list(
+                    fw_token, page_no=page, user_identifier=user_identifier
+                )
                 if res and "lineups" in res:
                     for lineup in res.get("lineups", []):
                         if self._is_target_lineup(lineup, lineup_id):
@@ -1825,7 +2764,9 @@ class RocomPlugin(Star):
             hint_str = f"💡 当前分类：{category} | /洛克阵容 {category} 2 查看下一页"
 
         try:
-            res = await self.client.get_lineup_list(fw_token, page_no=page_no, category=category)
+            res = await self.client.get_lineup_list(
+                fw_token, page_no=page_no, category=category, user_identifier=self._get_user_identifier(event)
+            )
         except Exception as e:
             yield event.plain_result(f"获取阵容数据异常：{str(e)}")
             return

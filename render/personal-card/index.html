@@ -24,9 +24,24 @@
     }
 
     .stats-cont {
-      height: 6.7rem !important;
+      height: auto !important;
+      min-height: 6.7rem !important;
+      display: block !important;
+      overflow: visible !important;
       background: url('{{backgroundUrl}}') no-repeat center top;
-      background-size: cover;
+      background-size: 100% 100%;
+      background-color: #d8cfbf;
+    }
+
+    .page-section-main {
+      height: auto !important;
+      min-height: 6.7rem !important;
+      overflow: visible !important;
+    }
+
+    .stats-cont .stats-page {
+      position: relative !important;
+      inset: auto !important;
     }
   </style>
 </head>
@@ -48,7 +63,25 @@
                   <span class="name">{{userName}}</span>
                   <span class="level">Lv. {{userLevel}}</span>
                 </div>
-                <div class="user-uid">ID:{{userUid}}</div>
+                <div class="user-uid-row">
+                  <div class="user-uid">ID:{{userUid}}</div>
+                  {{if hasExtraProfileData}}
+                  <div class="user-status-badge">
+                    <span class="status-dot {{profileStatusClass}}"></span>
+                    <span class="status-text">{{profileStatusText}}</span>
+                  </div>
+                  {{/if}}
+                </div>
+                {{if hasExtraProfileData && profileHeadTags && profileHeadTags.length}}
+                <div class="user-head-tags">
+                  {{each profileHeadTags tag}}
+                  <div class="head-tag">
+                    <span class="head-tag-label">{{tag.label}}</span>
+                    <span class="head-tag-value">{{tag.value}}</span>
+                  </div>
+                  {{/each}}
+                </div>
+                {{/if}}
               </div>
             </div>
             <div class="user-info-bottom">
@@ -61,6 +94,12 @@
                 <span class="num num-text">{{starName}}</span>
               </div>
             </div>
+            {{if showProfileSignature}}
+            <div class="user-signature-inline">
+              <span class="user-signature-label">个性签名</span>
+              <span class="user-signature-text">{{profileSignature}}</span>
+            </div>
+            {{/if}}
           </div>
 
           <div class="stats-ai-panel">
@@ -82,7 +121,7 @@
 
             <div class="chart-wrapper">
               <div class="chart-box">
-                <svg class="radar-svg" viewBox="0 0 260 220" aria-hidden="true">
+                <svg class="radar-svg" viewBox="0 0 260 260" aria-hidden="true">
                   {{each radarPolygons polygon}}
                   <polygon points="{{polygon}}" class="radar-grid{{if $index === radarPolygons.length - 1}} radar-grid-outer{{/if}}"></polygon>
                   {{/each}}
@@ -214,6 +253,34 @@
           </div>
         </div>
       </div>
+
+      {{if hasExtraProfileData}}
+      <div class="profile-fusion-board">
+        <div class="profile-fusion-grid">
+          <div class="profile-card-showcase">
+            <div class="profile-card-preview">
+              {{if profileCardImage}}
+              <img class="profile-card-image" src="{{profileCardImage}}" alt="名片展示">
+              {{else}}
+              <div class="profile-card-placeholder">暂无名片图片</div>
+              {{/if}}
+            </div>
+          </div>
+
+          <div class="profile-fusion-card">
+            <div class="profile-fusion-title">家园信息</div>
+            <div class="profile-home-grid">
+              {{each profileHomeItems item}}
+              <div class="profile-home-item">
+                <span class="profile-home-label">{{item.label}}</span>
+                <span class="profile-home-value">{{item.value}}</span>
+              </div>
+              {{/each}}
+            </div>
+          </div>
+        </div>
+      </div>
+      {{/if}}
     </div>
     <div class="pagination-footer">
       <span class="pagination-hint">{{commandHint}}</span>
@@ -222,3 +289,4 @@
   </div>
 </body>
 </html>
+

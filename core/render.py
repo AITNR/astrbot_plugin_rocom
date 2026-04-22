@@ -339,7 +339,14 @@ class Renderer:
                         '.bwiki-shell',
                         '.skill-shell',
                         '.page-section-main',
-                        '.lineup-page'
+                        '.lineup-page',
+                        '.inspect-page',
+                        '.player-search-page',
+                        '.ingame-shop-page',
+                        '.friendship-page',
+                        '.student-state-page',
+                        '.student-perks-page',
+                        '.student-page'
                     ];
                     for (const selector of selectors) {
                         const element = document.querySelector(selector);
