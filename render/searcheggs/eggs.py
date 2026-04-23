@@ -111,7 +111,7 @@ class EggSearcher:
 
     def search_by_size(self, height: float = None, weight: float = None) -> dict:
         """
-        通过身高(cm)或体重(kg)反查精灵。
+        通过身高或体重(kg)反查精灵。
         返回结构：
         {
             "perfect": [精确匹配的精灵列表],
@@ -194,7 +194,7 @@ class EggSearcher:
         """构建身高/体重反查结果文本（区分完美匹配和范围匹配）"""
         cond = []
         if height is not None:
-            cond.append(f"身高={height}cm")
+            cond.append(f"身高={self._fmt_range(self._ht(height), self._ht(height), 'm')}")
         if weight is not None:
             cond.append(f"体重={weight}kg")
         cond_str = " + ".join(cond)
@@ -210,7 +210,7 @@ class EggSearcher:
             for i, p in enumerate(results["perfect"][:10], 1):
                 zh = self._name(p)
                 br = p.get("breeding") or {}
-                h_str = self._fmt_range(br.get("height_low"), br.get("height_high"), "cm")
+                h_str = self._fmt_range(self._ht(br.get("height_low")), self._ht(br.get("height_high")), "m")
                 w_str = self._fmt_range(self._wt(br.get("weight_low")), self._wt(br.get("weight_high")), "kg")
                 egs = format_egg_groups(self.get_egg_groups(p))
                 lines.append(f"  {i}. {zh} (#{p['id']}) — {h_str} / {w_str} · {egs}")
@@ -225,7 +225,7 @@ class EggSearcher:
             for i, p in enumerate(results["range"][:10], 1):
                 zh = self._name(p)
                 br = p.get("breeding") or {}
-                h_str = self._fmt_range(br.get("height_low"), br.get("height_high"), "cm")
+                h_str = self._fmt_range(self._ht(br.get("height_low")), self._ht(br.get("height_high")), "m")
                 w_str = self._fmt_range(self._wt(br.get("weight_low")), self._wt(br.get("weight_high")), "kg")
                 egs = format_egg_groups(self.get_egg_groups(p))
                 lines.append(f"  {i}. {zh} (#{p['id']}) — {h_str} / {w_str} · {egs}")
@@ -383,7 +383,7 @@ class EggSearcher:
             "shared_egg_group_labels": [get_egg_group_label(g) for g in shared],
             "hatch_label": self._fmt_dur(br.get("hatch_data")),
             "weight_label": self._fmt_range(self._wt(br.get("weight_low")), self._wt(br.get("weight_high")), "kg"),
-            "height_label": self._fmt_range(br.get("height_low"), br.get("height_high"), "cm"),
+            "height_label": self._fmt_range(self._ht(br.get("height_low")), self._ht(br.get("height_high")), "m"),
         }
 
     # ── 构建渲染数据 ──
@@ -429,7 +429,7 @@ class EggSearcher:
             "male_rate": bp.get("male_rate"), "female_rate": bp.get("female_rate"),
             "hatch_label": self._fmt_dur(br.get("hatch_data")),
             "weight_label": self._fmt_range(self._wt(br.get("weight_low")), self._wt(br.get("weight_high")), "kg"),
-            "height_label": self._fmt_range(br.get("height_low"), br.get("height_high"), "cm"),
+            "height_label": self._fmt_range(self._ht(br.get("height_low")), self._ht(br.get("height_high")), "m"),
             "total_compatible": len(compat),
             "is_undiscovered": 1 in egs,
             "egg_group_sections": sections,
@@ -482,7 +482,7 @@ class EggSearcher:
                 "name": v.get("name", ""),
                 "hatch_label": self._fmt_dur(v.get("hatch_data")),
                 "weight_label": self._fmt_range(self._wt(v.get("weight_low")), self._wt(v.get("weight_high")), "kg"),
-                "height_label": self._fmt_range(v.get("height_low"), v.get("height_high"), "cm"),
+                "height_label": self._fmt_range(self._ht(v.get("height_low")), self._ht(v.get("height_high")), "m"),
                 "precious_egg_type": v.get("precious_egg_type"),
                 "precious_egg_label": self._get_precious_egg_label(v.get("precious_egg_type")),
             }
@@ -570,6 +570,10 @@ class EggSearcher:
     @staticmethod
     def _wt(v) -> Optional[float]:
         return round(v/1000, 1) if v is not None else None
+
+    @staticmethod
+    def _ht(v) -> Optional[float]:
+        return round(v/100, 2) if v is not None else None
 
     @staticmethod
     def _fmt_range(lo, hi, u: str) -> str:

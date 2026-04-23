@@ -19,7 +19,7 @@ from .core.user import UserManager, MerchantSubscriptionManager
 from .core.render import Renderer
 from .core.egg_service import EggService, SearchResult
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.5.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.5.3", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -545,6 +545,7 @@ class RocomPlugin(Star):
             sub["last_push_round"] = round_info["round_id"]
             sub["last_matched_items"] = matched
             await self.merchant_sub_mgr.upsert_subscription(key, sub)
+            await asyncio.sleep(5)
 
     def _split_merchant_subscription_items(self, raw_text: str) -> List[str]:
         parts = re.split(r"[\s,，、/|；;]+", raw_text.strip())
@@ -1630,7 +1631,7 @@ class RocomPlugin(Star):
                         {"cmd": "洛克wiki <精灵名>", "desc": "暂不可用：接口暂时关闭，当前仅返回提示"},
                         {"cmd": "洛克技能 <技能名>", "desc": "暂不可用：接口暂时关闭，当前仅返回提示"},
                         {"cmd": "洛克查蛋 <精灵名>", "desc": "查询精灵蛋组及可配种精灵 (支持别名：查蛋)"},
-                        {"cmd": "洛克查蛋 25 1.5", "desc": "按身高和体重反查精灵，双参数优先使用后端尺寸查询"},
+                        {"cmd": "洛克查蛋 0.18m 1.5kg", "desc": "按身高和体重反查精灵，身高统一使用游戏原生 m"},
                         {"cmd": "洛克配种 <精灵A> <精灵B>", "desc": "判断两只精灵能否配种 (支持别名：配种)"}
                     ]
                 },
@@ -1664,8 +1665,20 @@ class RocomPlugin(Star):
     async def _save_binding_with_role_info(self, event: AstrMessageEvent, fw_token: str, login_type: str, user_id: str):
         yield event.plain_result("登录成功，正在调用绑定接口...")
         bind_res = await self.client.create_binding(fw_token, user_id)
-        if not bind_res or not bind_res.get("binding"):
-            yield event.plain_result("绑定接口调用失败，请稍后重试。")
+        binding_data = (bind_res or {}).get("binding") or {}
+        if not binding_data:
+            bindings_res = await self.client.get_bindings(user_id)
+            bindings = (bindings_res or {}).get("bindings") or []
+            binding_data = next(
+                (
+                    item for item in bindings
+                    if (item.get("framework_token") or "") == fw_token
+                ),
+                {},
+            )
+        if not binding_data:
+            err = self.client.get_last_error("绑定接口调用失败")
+            yield event.plain_result(f"绑定接口调用失败：{err}")
             return
         
         yield event.plain_result("绑定成功，正在获取角色信息...")
@@ -1673,13 +1686,38 @@ class RocomPlugin(Star):
         
         # 检查角色信息获取是否成功
         if not role_res or not role_res.get("role"):
-            logger.warning(f"[Rocom] 获取角色信息失败，fw_token 可能无效或过期")
-            yield event.plain_result("⚠️ 绑定成功，但获取角色信息失败（凭证可能无效或已过期）。请尝试重新登录。")
+            err = self.client.get_last_error("获取角色信息失败")
+            logger.warning(f"[Rocom] 获取角色信息失败：{err}")
+
+            binding_id = binding_data.get("id", fw_token)
+            fallback_role_id = binding_data.get("tgp_id") or "未知"
+            fallback_login_type = binding_data.get("login_type") or login_type
+            fallback_nickname = "未初始化角色"
+            binding = {
+                "framework_token": fw_token,
+                "binding_id": binding_id,
+                "login_type": fallback_login_type,
+                "role_id": str(fallback_role_id),
+                "nickname": fallback_nickname,
+                "bind_time": int(time.time() * 1000),
+                "is_primary": True
+            }
+            await self.user_mgr.add_binding(user_id, binding)
+
+            if "8258601" in err:
+                yield event.plain_result(
+                    "⚠️ 绑定已保存，但当前账号暂时查不到洛克角色资料（上游错误 8258601）。"
+                    "这通常表示该账号尚未完成洛克角色初始化，或上游暂未返回角色数据。"
+                    "你之后可直接重试 /洛克档案，无需重新登录。"
+                )
+            else:
+                yield event.plain_result(
+                    f"⚠️ 绑定已保存，但获取角色信息失败：{err}。"
+                    "你之后可直接重试 /洛克档案，无需重新登录。"
+                )
             return
         
         role = role_res.get("role", {})
-        
-        binding_data = bind_res.get("binding", {})
         binding_id = binding_data.get("id", fw_token)
         
         binding = {
@@ -1711,7 +1749,7 @@ class RocomPlugin(Star):
         user_id = event.get_sender_id()
         qr_data = await self.client.qq_qr_login(user_id)
         if not qr_data or "qr_image" not in qr_data:
-            yield event.plain_result("获取 QQ 二维码失败。")
+            yield event.plain_result(f"获取 QQ 二维码失败：{self.client.get_last_error()}")
             return
             
         fw_token = qr_data["frameworkToken"]
@@ -1778,7 +1816,7 @@ class RocomPlugin(Star):
         user_id = event.get_sender_id()
         qr_data = await self.client.wechat_qr_login(user_id)
         if not qr_data or "qr_image" not in qr_data:
-            yield event.plain_result("获取微信登录链接失败。")
+            yield event.plain_result(f"获取微信登录链接失败：{self.client.get_last_error()}")
             return
             
         fw_token = qr_data["frameworkToken"]
@@ -1836,7 +1874,7 @@ class RocomPlugin(Star):
         user_id = event.get_sender_id()
         res = await self.client.import_token(tgp_id, tgp_ticket, user_id)
         if not res or not res.get("frameworkToken"):
-            err_msg = res.get("message") if isinstance(res, dict) and res.get("message") else "凭证导入失败"
+            err_msg = self.client.get_last_error("凭证导入失败")
             yield event.plain_result(f"{err_msg}。")
             return
         fw_token = res["frameworkToken"]
@@ -2550,9 +2588,9 @@ class RocomPlugin(Star):
             return
         
         # 从 event.message_str 中提取完整参数，避免 AstrBot 按空格拆分
-        full_cmd = event.message_str or ""
-        if "订阅远行商人" in full_cmd:
-            args_text = full_cmd.split("订阅远行商人", 1)[1].strip()
+        full_command = event.message_str or ""
+        if "订阅远行商人" in full_command:
+            args_text = full_command.split("订阅远行商人", 1)[1].strip()
         else:
             args_text = args.strip()
         
@@ -2827,21 +2865,43 @@ class RocomPlugin(Star):
             yield event.plain_result(
                 "🥚 查蛋用法：\n"
                 "  /洛克查蛋 <精灵名>     — 查询蛋组及可配种精灵\n"
-                "  /洛克查蛋 25 1.5       — 按身高(cm)+体重(kg)反查（前身高后体重）\n"
-                "  /洛克查蛋 25            — 仅按身高(cm)反查\n"
-                "  /洛克查蛋 身高25 体重1.5 — 带前缀也行"
+                "  /洛克查蛋 0.18 1.5     — 按身高(m)+体重(kg)反查（游戏原生单位）\n"
+                "  /洛克查蛋 0.18m 1.5kg  — 带单位反查，身高统一使用 m\n"
+                "  /洛克查蛋 0.18         — 仅按身高(m)反查\n"
+                "  /洛克查蛋 身高0.18m 体重1.5kg — 带前缀和单位也行"
             )
             return
 
-        # 解析：两个数字 = 前身高后体重；带前缀也兼容
+        # 解析：两个数字 = 前身高后体重；身高统一使用游戏原生 m，体重使用 kg。
         height, weight = None, None
+        height_m, height_display = None, None
         name_parts = []
 
         def try_parse_num(s):
             try:
                 return float(s)
-            except ValueError:
+            except (TypeError, ValueError):
                 return None
+
+        def parse_height_value(raw: str):
+            text = str(raw or "").strip().lower()
+            text = re.sub(r"^(身高|高度|h)", "", text, flags=re.IGNORECASE).strip()
+            match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(m|米)?", text)
+            if not match:
+                return None
+            value = float(match.group(1))
+            unit = match.group(2) or ""
+            if unit in {"m", "米"}:
+                return value * 100, value, f"{value:g} m"
+            return value * 100, value, f"{value:g} m"
+
+        def parse_weight_value(raw: str):
+            text = str(raw or "").strip().lower()
+            text = re.sub(r"^(体重|重量|w)", "", text, flags=re.IGNORECASE).strip()
+            match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(kg|千克|公斤)?", text)
+            if not match:
+                return None
+            return float(match.group(1))
 
         nums_parsed = []
         for raw_arg in [arg1, arg2]:
@@ -2850,28 +2910,33 @@ class RocomPlugin(Star):
             arg = str(raw_arg)
             # 带前缀的显式写法
             if arg.startswith("身高") or arg.startswith("h") or arg.startswith("H"):
-                v = try_parse_num(arg.lstrip("身高hH"))
-                if v is not None:
-                    height = v
+                parsed = parse_height_value(arg)
+                if parsed is not None:
+                    height, height_m, height_display = parsed
                     continue
             if arg.startswith("体重") or arg.startswith("w") or arg.startswith("W"):
-                v = try_parse_num(arg.lstrip("体重wW"))
+                v = parse_weight_value(arg)
                 if v is not None:
                     weight = v
                     continue
-            # 纯数字：按顺序 前身高后体重
-            v = try_parse_num(arg)
-            if v is not None:
-                nums_parsed.append(v)
+            # 纯数字/带单位：按顺序 前身高后体重
+            height_candidate = parse_height_value(arg)
+            weight_candidate = parse_weight_value(arg)
+            if height_candidate is not None or weight_candidate is not None:
+                nums_parsed.append((arg, height_candidate, weight_candidate))
             else:
                 name_parts.append(arg)
 
         # 纯数字按位置分配
         if nums_parsed:
             if height is None and len(nums_parsed) >= 1:
-                height = nums_parsed[0]
+                parsed = nums_parsed[0][1]
+                if parsed is not None:
+                    height, height_m, height_display = parsed
             if weight is None and len(nums_parsed) >= 2:
-                weight = nums_parsed[1]
+                parsed_weight = nums_parsed[1][2]
+                if parsed_weight is not None:
+                    weight = parsed_weight
 
         # 身高/体重反查模式
         if height is not None or weight is not None:
@@ -2881,20 +2946,22 @@ class RocomPlugin(Star):
             text_result = None
 
             if use_backend_size_query:
-                results = await self.client.query_pet_size(height / 100, weight)
+                results = await self.client.query_pet_size(height_m if height_m is not None else height / 100, weight)
                 if results is not None:
                     data = self.egg_searcher.build_size_search_data_from_api(
-                        height, weight, results
+                        height, weight, results, height_display=height_display
                     )
                     text_result = self.egg_searcher.build_size_search_text_from_api(
-                        height, weight, results
+                        height, weight, results, height_display=height_display
                     )
 
             if data is None:
                 results = self.egg_searcher.search_by_size(height=height, weight=weight)
-                data = self.egg_searcher.build_size_search_data(height, weight, results)
+                data = self.egg_searcher.build_size_search_data(
+                    height, weight, results, height_display=height_display
+                )
                 text_result = self.egg_searcher.build_size_search_text(
-                    height, weight, results
+                    height, weight, results, height_display=height_display
                 )
 
             img_url = await self.renderer.render_html("render/searcheggs/size.html", data)
@@ -2934,7 +3001,7 @@ class RocomPlugin(Star):
 
         try:
             data = self.egg_searcher.build_search_data(pet)
-            data["commandHint"] = "💡 /洛克查蛋 <名称> | /洛克查蛋 身高25 体重1.5 | /洛克配种 <父> <母>"
+            data["commandHint"] = "💡 /洛克查蛋 <名称> | /洛克查蛋 身高0.25 体重1.5 | /洛克配种 <父> <母>"
             data["copyright"] = "AstrBot & WeGame Locke Kingdom Plugin"
             img_url = await self.renderer.render_html("render/searcheggs/index.html", data)
             if img_url:

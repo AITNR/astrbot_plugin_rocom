@@ -12,7 +12,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=45B7D1)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/issues)
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-FFc65f?style=for-the-badge\&logo=python)](https://github.com/Soulter/AstrBot)
 
-### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.5.0
+### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.5.3
 
 ### 扫码绑定 · 个人档案 · 最近战绩 · 精灵背包 · 阵容助手
 
@@ -178,8 +178,8 @@ astrbot_plugin_rocom/
 | 指令                        | 说明                                           |
 | :------------------------ | :------------------------------------------- |
 | `洛克查蛋 <精灵名>`             | 查询精灵蛋组、性别比、孵化信息及同蛋组可配种精灵（别名：`查蛋`）           |
-| `洛克查蛋 25 1.5`              | 按身高+体重反查（前身高cm 后体重kg，双参数时优先走后端尺寸查询）                 |
-| `洛克查蛋 25`                  | 仅按身高(cm)反查                                    |
+| `洛克查蛋 0.18 1.5`            | 按身高+体重反查（前身高 m 后体重 kg，双参数时优先走后端尺寸查询）                 |
+| `洛克查蛋 0.18`                | 仅按身高(m)反查                                    |
 | `洛克配种 <父体> <母体>`         | 判断能否配种，默认前父后母，孵蛋结果跟随母体（别名：`配种`）             |
 | `洛克配种 <精灵名>`             | 想要孵出该精灵？查询需要哪些父母组合及性别要求                     |
 
@@ -196,7 +196,7 @@ astrbot_plugin_rocom/
 
 | `洛克档案` | `洛克战绩` |
 |:---:|:---:|
-| <img width="1280" height="1201" alt="59cc1ab91af1391a4689e8ece6646a80" src="https://github.com/user-attachments/assets/93588191-57dd-4726-ab95-8b69d047e2d6" /> | <img width="1920" height="512" alt="image" src="https://github.com/user-attachments/assets/df897cf8-c16c-4d7a-8d3a-b6b578e6d7a5"> |
+| <img width="1886" height="1072" alt="image" src="https://github.com/user-attachments/assets/fd92e4f2-8ed1-4522-ae7e-25ad3f64024d"> | <img width="1920" height="512" alt="image" src="https://github.com/user-attachments/assets/df897cf8-c16c-4d7a-8d3a-b6b578e6d7a5"> |
 
 | `洛克背包` | `洛克交换大厅` |
 |:---:|:---:|
@@ -249,6 +249,24 @@ astrbot_plugin_rocom/
 
 <details>
 <summary>点击展开版本历史</summary>
+
+### v2.5.3 (2026-04-23)
+
+**修复**
+- 尺寸反查渲染新增独立“匹配”行，匹配率/命中次数不再混入蛋组字段
+- 本地兜底尺寸反查也会展示匹配信息，同名合并时同步累加匹配率与命中次数
+
+### v2.5.2 (2026-04-23)
+
+**修复**
+- 修正尺寸反查同名结果合并逻辑：不再剥离颜色前缀，避免误合并不同形态
+- 后端尺寸查询返回的同名重复项会累加匹配率与命中次数，并聚合编号、身高、体重范围后展示
+
+### v2.5.1 (2026-04-23)
+
+**优化**
+- 尺寸反查统一使用游戏原生 `m` 输入与展示，移除旧单位兼容分支
+- 同名同色尺寸结果改为聚合展示编号与尺寸范围，避免简单去重导致数据丢失
 
 ### v2.5.0 (2026-04-22)
 
