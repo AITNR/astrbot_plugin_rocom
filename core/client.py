@@ -15,6 +15,10 @@ from astrbot.api import logger
 class RocomClient:
     """洛克王国 API 客户端"""
 
+    LOGIN_PROVIDER = "rocom"
+    CLIENT_TYPE = "bot"
+    CLIENT_ID = "astrbot"
+
     def __init__(
         self,
         base_url: str = "https://wegame.shallow.ink",
@@ -42,7 +46,11 @@ class RocomClient:
         return self._client
 
     def _wegame_headers(
-        self, fw_token: str = "", user_identifier: str = ""
+        self,
+        fw_token: str = "",
+        user_identifier: str = "",
+        client_type: str = "",
+        client_id: str = "",
     ) -> Dict[str, str]:
         """登录/账号管理接口的请求头 (scope=wegame)"""
         headers = {}
@@ -53,6 +61,10 @@ class RocomClient:
             headers["X-Framework-Token"] = fw_token
         if user_identifier:
             headers["X-User-Identifier"] = self._sanitize_uid(user_identifier)
+        if client_type:
+            headers["X-Client-Type"] = client_type
+        if client_id:
+            headers["X-Client-ID"] = client_id
         return headers
 
     def _sanitize_uid(self, uid: str) -> str:
@@ -89,8 +101,14 @@ class RocomClient:
             
             # 检查响应状态码
             if resp.status_code != 200:
-                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code}")
-                self._set_last_error(f"HTTP {resp.status_code}")
+                body_hint = resp.text[:300] if resp.text else ""
+                try:
+                    body_json = resp.json()
+                    body_hint = body_json.get("message") or body_hint
+                except Exception:
+                    pass
+                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code} {body_hint}")
+                self._set_last_error(f"HTTP {resp.status_code}: {body_hint}".strip(": "))
                 return None
             
             # 检查响应内容是否为空
@@ -145,8 +163,14 @@ class RocomClient:
             
             # 检查响应状态码
             if resp.status_code != 200:
-                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code}")
-                self._set_last_error(f"HTTP {resp.status_code}")
+                body_hint = resp.text[:300] if resp.text else ""
+                try:
+                    body_json = resp.json()
+                    body_hint = body_json.get("message") or body_hint
+                except Exception:
+                    pass
+                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code} {body_hint}")
+                self._set_last_error(f"HTTP {resp.status_code}: {body_hint}".strip(": "))
                 return None
             
             # 检查响应内容是否为空
@@ -192,8 +216,14 @@ class RocomClient:
             
             # 检查响应状态码
             if resp.status_code != 200:
-                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code}")
-                self._set_last_error(f"HTTP {resp.status_code}")
+                body_hint = resp.text[:300] if resp.text else ""
+                try:
+                    body_json = resp.json()
+                    body_hint = body_json.get("message") or body_hint
+                except Exception:
+                    pass
+                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code} {body_hint}")
+                self._set_last_error(f"HTTP {resp.status_code}: {body_hint}".strip(": "))
                 return None
             
             # 检查响应内容是否为空
@@ -235,12 +265,20 @@ class RocomClient:
         self, user_identifier: str = ""
     ) -> Optional[Dict]:
         """发起 QQ 扫码登录，返回 frameworkToken + qr_image (base64)"""
-        params = {"client_type": "bot", "client_id": "astrbot"}
+        params = {
+            "client_type": self.CLIENT_TYPE,
+            "client_id": self.CLIENT_ID,
+            "provider": self.LOGIN_PROVIDER,
+        }
         if user_identifier:
             params["user_identifier"] = self._sanitize_uid(user_identifier)
         return await self._get(
             "/api/v1/login/wegame/qr",
-            self._wegame_headers(user_identifier=user_identifier),
+            self._wegame_headers(
+                user_identifier=user_identifier,
+                client_type=self.CLIENT_TYPE,
+                client_id=self.CLIENT_ID,
+            ),
             params=params,
         )
 
@@ -263,12 +301,20 @@ class RocomClient:
         self, user_identifier: str = ""
     ) -> Optional[Dict]:
         """发起微信扫码登录，返回 frameworkToken + qr_image (URL)"""
-        params = {"client_type": "bot", "client_id": "astrbot"}
+        params = {
+            "client_type": self.CLIENT_TYPE,
+            "client_id": self.CLIENT_ID,
+            "provider": self.LOGIN_PROVIDER,
+        }
         if user_identifier:
             params["user_identifier"] = self._sanitize_uid(user_identifier)
         return await self._get(
             "/api/v1/login/wegame/wechat/qr",
-            self._wegame_headers(user_identifier=user_identifier),
+            self._wegame_headers(
+                user_identifier=user_identifier,
+                client_type=self.CLIENT_TYPE,
+                client_id=self.CLIENT_ID,
+            ),
             params=params,
         )
 
@@ -323,14 +369,19 @@ class RocomClient:
         body: Dict[str, Any] = {
             "tgp_id": tgp_id,
             "tgp_ticket": tgp_ticket,
-            "client_type": "bot",
-            "client_id": "astrbot",
+            "provider": self.LOGIN_PROVIDER,
+            "client_type": self.CLIENT_TYPE,
+            "client_id": self.CLIENT_ID,
         }
         if user_identifier:
             body["user_identifier"] = user_identifier
         return await self._post(
             "/api/v1/login/wegame/token",
-            self._wegame_headers(user_identifier=user_identifier),
+            self._wegame_headers(
+                user_identifier=user_identifier,
+                client_type=self.CLIENT_TYPE,
+                client_id=self.CLIENT_ID,
+            ),
             json_data=body,
         )
 
@@ -342,13 +393,17 @@ class RocomClient:
         payload = {
             "framework_token": fw_token,
             "user_identifier": user_identifier,
-            "client_type": "bot",
-            "client_id": "astrbot",
+            "client_type": self.CLIENT_TYPE,
+            "client_id": self.CLIENT_ID,
         }
         return await self._post(
             "/api/v1/user/bindings",
             # 这里必须带 API Key
-            self._wegame_headers(user_identifier=user_identifier),
+            self._wegame_headers(
+                user_identifier=user_identifier,
+                client_type=self.CLIENT_TYPE,
+                client_id=self.CLIENT_ID,
+            ),
             json_data=payload,
         )
 
