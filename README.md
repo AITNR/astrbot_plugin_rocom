@@ -12,7 +12,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/Entropy-Increase-Team/astrbot_plugin_rocom?style=for-the-badge\&color=45B7D1)](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom/issues)
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-FFc65f?style=for-the-badge\&logo=python)](https://github.com/Soulter/AstrBot)
 
-### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.5.3
+### 🚀 基于 WeGame API & 洛克王国数据 的查询工具 v2.6.0
 
 ### 扫码绑定 · 个人档案 · 最近战绩 · 精灵背包 · 阵容助手
 
@@ -83,9 +83,8 @@ playwright install chromium
 | `api_base_url`   | string | `https://wegame.shallow.ink` | API 服务后端地址                              |
 | `wegame_api_key` | string | 无                            | ⚠️ 必填，拥有 wegame 作用域的 API Key，统一用于各项查询获取 |
 | `render_timeout` | number | `30000`                      | 图片渲染超时时间（毫秒）                            |
-| `merchant_subscription_enabled` | bool | `true` | 是否启用远行商人订阅推送 |
+| `merchant_subscription_enabled` | bool | `true` | 是否启用远行商人订阅推送（固定在 08:01 / 12:01 / 16:01 / 20:01 检查，空结果每 4 分钟最多重试 3 次） |
 | `merchant_subscription_items` | list | `["国王球","棱镜球","炫彩精灵蛋"]` | 远行商人默认订阅商品 |
-| `merchant_check_cron` | string | `*/5 * * * *` | 远行商人轮询计划 |
 
 ### 安全免责声明
 
@@ -249,6 +248,13 @@ astrbot_plugin_rocom/
 
 <details>
 <summary>点击展开版本历史</summary>
+
+### v2.6.0 (2026-04-25)
+
+**优化**
+- 重构远行商人订阅调度逻辑，不再依赖 AstrBot cron 轮询
+- 远行商人订阅改为固定在每日 `08:01 / 12:01 / 16:01 / 20:01` 检查
+- 若后端该轮返回空商品，则每 4 分钟最多重试 3 次，三次后暂停本轮重试
 
 ### v2.5.3 (2026-04-23)
 

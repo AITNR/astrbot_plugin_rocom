@@ -1,8 +1,8 @@
 {
   "wegame_api_key": {
     "type": "string",
-    "description": "WeGame作用域 API Key",
-    "hint": "用于访问 API 的开发者密钥（可先使用公开key，加群等待前端完毕后订阅私key）",
+    "description": "WeGame API Key",
+    "hint": "用于访问 WeGame API 的开发者密钥",
     "default": ""
   },
   "api_base_url": {
@@ -47,7 +47,7 @@
   "merchant_subscription_enabled": {
     "type": "bool",
     "description": "启用远行商人订阅推送",
-    "hint": "开启后会周期检查远行商人商品并向已订阅群推送",
+    "hint": "开启后会在每日 08:01 / 12:01 / 16:01 / 20:01 检查一次，若为空则每 4 分钟最多重试 3 次",
     "default": true
   },
   "merchant_subscription_items": {
@@ -58,11 +58,5 @@
     "items": {
       "type": "string"
     }
-  },
-  "merchant_check_cron": {
-    "type": "string",
-    "description": "远行商人检查计划",
-    "hint": "Cron 表达式，默认每 5 分钟检查一次并按轮次去重推送",
-    "default": "*/5 * * * *"
   }
 }

@@ -19,7 +19,7 @@ from .core.user import UserManager, MerchantSubscriptionManager
 from .core.render import Renderer
 from .core.egg_service import EggService, SearchResult
 
-@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.5.3", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
+@register("astrbot_plugin_rocom", "bvzrays & 熵增项目组", "洛克王国插件", "v2.6.0", "https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom")
 class RocomPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -57,11 +57,9 @@ class RocomPlugin(Star):
         self.merchant_subscription_items = self.config.get(
             "merchant_subscription_items", ["国王球", "棱镜球", "炫彩精灵蛋"]
         )
-        self.merchant_check_cron = self.config.get(
-            "merchant_check_cron", "*/5 * * * *"
-        )
-        self._merchant_cron_job_id = None
-        self._merchant_job_setup_task = None
+        self._merchant_subscription_task = None
+        self._merchant_retry_delay_seconds = 240
+        self._merchant_retry_times = 3
         
         # 启动时检查是否需要开启自动刷新
         logger.info(f"[Rocom] 插件初始化完成，自动刷新启用状态：{self.auto_refresh_enabled}, 刷新时间：{self.auto_refresh_time}, 通知群：{self.auto_refresh_notify_group}")
@@ -72,22 +70,16 @@ class RocomPlugin(Star):
             logger.info("[Rocom] 自动刷新功能未启用")
         
         if self.merchant_subscription_enabled:
-            self._merchant_job_setup_task = asyncio.create_task(
-                self._register_merchant_subscription_job()
+            self._merchant_subscription_task = asyncio.create_task(
+                self._merchant_subscription_loop()
             )
 
     async def terminate(self):
-        if self._merchant_job_setup_task and not self._merchant_job_setup_task.done():
-            self._merchant_job_setup_task.cancel()
+        if self._merchant_subscription_task and not self._merchant_subscription_task.done():
+            self._merchant_subscription_task.cancel()
             try:
-                await self._merchant_job_setup_task
+                await self._merchant_subscription_task
             except asyncio.CancelledError:
-                pass
-        cron_mgr = getattr(self.context, "cron_manager", None)
-        if cron_mgr and self._merchant_cron_job_id:
-            try:
-                await cron_mgr.delete_job(self._merchant_cron_job_id)
-            except Exception:
                 pass
         if self._auto_refresh_task and not self._auto_refresh_task.done():
             self._auto_refresh_task.cancel()
@@ -331,21 +323,44 @@ class RocomPlugin(Star):
         except Exception as e:
             logger.error(f"[自动刷新] 发送群消息失败：{e}")
 
-    async def _register_merchant_subscription_job(self):
-        cron_mgr = getattr(self.context, "cron_manager", None)
-        if not cron_mgr:
-            logger.warning("[Rocom] cron_manager unavailable, merchant push disabled")
-            return
-        try:
-            job = await cron_mgr.add_basic_job(
-                name="rocom_merchant_subscription",
-                cron_expression=self.merchant_check_cron,
-                handler=self._check_merchant_subscriptions,
-                persistent=False,
-            )
-            self._merchant_cron_job_id = job.job_id
-        except Exception as e:
-            logger.error(f"[Rocom] failed to register merchant cron job: {e}")
+    def _merchant_check_times(self, base: datetime | None = None) -> List[datetime]:
+        now = base or datetime.now(self._cn_tz())
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=self._cn_tz())
+        return [
+            now.replace(hour=8, minute=1, second=0, microsecond=0),
+            now.replace(hour=12, minute=1, second=0, microsecond=0),
+            now.replace(hour=16, minute=1, second=0, microsecond=0),
+            now.replace(hour=20, minute=1, second=0, microsecond=0),
+        ]
+
+    def _next_merchant_check_time(self, now: datetime | None = None) -> datetime:
+        current = now or datetime.now(self._cn_tz())
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=self._cn_tz())
+        for check_time in self._merchant_check_times(current):
+            if check_time > current:
+                return check_time
+        next_day = current + timedelta(days=1)
+        return self._merchant_check_times(next_day)[0]
+
+    async def _merchant_subscription_loop(self):
+        logger.info("[Rocom] 远行商人订阅循环任务已启动")
+        while True:
+            try:
+                now = datetime.now(self._cn_tz())
+                next_check = self._next_merchant_check_time(now)
+                sleep_seconds = max(1, (next_check - now).total_seconds())
+                logger.info(
+                    f"[Rocom] 下次远行商人订阅检查时间：{next_check.strftime('%Y-%m-%d %H:%M:%S CST')}"
+                )
+                await asyncio.sleep(sleep_seconds)
+                await self._run_merchant_subscription_window()
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"[Rocom] 远行商人订阅循环异常: {e}")
+                await asyncio.sleep(60)
 
     def _cn_tz(self):
         return timezone(timedelta(hours=8))
@@ -485,14 +500,22 @@ class RocomPlugin(Star):
         res = await self.client.get_merchant_info(refresh=refresh)
         activity, products = self._merchant_products_from_response(res)
         round_info = self._current_merchant_round()
+        return await self._render_merchant_image_from_data(activity, products, round_info), res, products, round_info
+
+    async def _render_merchant_image_from_data(
+        self,
+        activity: Dict[str, Any] | None,
+        products: List[Dict[str, Any]] | None,
+        round_info: Dict[str, Any] | None,
+    ):
         data = {
             "background": "{{_res_path}}img/bg.C8CUoi7I.jpg",
             "titleIcon": True,
-            "title": activity.get("name", "远行商人"),
-            "subtitle": activity.get("start_date", "每日 08:00 / 12:00 / 16:00 / 20:00 刷新"),
-            "product_count": len(products),
-            "round_info": round_info,
-            "products": products,
+            "title": (activity or {}).get("name", "远行商人"),
+            "subtitle": (activity or {}).get("start_date", "每日 08:00 / 12:00 / 16:00 / 20:00 刷新"),
+            "product_count": len(products or []),
+            "round_info": round_info or self._current_merchant_round(),
+            "products": products or [],
         }
         img_url = await self.renderer.render_html(
             "render/yuanxing-shangren/index.html",
@@ -503,21 +526,52 @@ class RocomPlugin(Star):
                 "viewport_height": 1200,
             },
         )
-        return img_url, res, products, round_info
+        return img_url
 
-    async def _check_merchant_subscriptions(self):
+    async def _run_merchant_subscription_window(self):
+        for retry_index in range(self._merchant_retry_times + 1):
+            status = await self._check_merchant_subscriptions()
+            if status != "empty":
+                return
+            if retry_index >= self._merchant_retry_times:
+                logger.warning("[Rocom] 远行商人订阅检查连续为空，已暂停本轮重试")
+                return
+            logger.warning(
+                f"[Rocom] 远行商人返回为空，{self._merchant_retry_delay_seconds // 60} 分钟后进行第 {retry_index + 1} 次重试"
+            )
+            await asyncio.sleep(self._merchant_retry_delay_seconds)
+
+    async def _check_merchant_subscriptions(self) -> str:
         all_subs = await self.merchant_sub_mgr.get_all_subscriptions()
         if not all_subs:
-            return
-        img_url, _, products, round_info = await self._render_merchant_image(refresh=True)
+            return "no_subscriptions"
+        try:
+            res = await self.client.get_merchant_info(refresh=True)
+            activity, products = self._merchant_products_from_response(res)
+        except Exception as e:
+            logger.warning(f"[Rocom] 远行商人订阅查询失败，视为空结果等待重试: {e}")
+            return "empty"
+        round_info = self._current_merchant_round()
         if not round_info["is_open"]:
-            return
+            return "closed"
+        if not products:
+            return "empty"
         product_names = {p.get("name", "") for p in products}
+        pending_pushes = []
         for key, sub in all_subs.items():
             items = sub.get("items") or self.merchant_subscription_items
             matched = [name for name in items if name in product_names]
             if not matched or sub.get("last_push_round") == round_info["round_id"]:
                 continue
+            pending_pushes.append((key, sub, matched))
+        if not pending_pushes:
+            return "done"
+        img_url = None
+        try:
+            img_url = await self._render_merchant_image_from_data(activity, products, round_info)
+        except Exception as e:
+            logger.warning(f"[Rocom] 远行商人订阅图片预渲染失败，将仅发送文本: {e}")
+        for key, sub, matched in pending_pushes:
             text_chain = MessageChain()
             if sub.get("mention_all"):
                 text_chain.at_all()
@@ -546,6 +600,7 @@ class RocomPlugin(Star):
             sub["last_matched_items"] = matched
             await self.merchant_sub_mgr.upsert_subscription(key, sub)
             await asyncio.sleep(5)
+        return "done"
 
     def _split_merchant_subscription_items(self, raw_text: str) -> List[str]:
         parts = re.split(r"[\s,，、/|；;]+", raw_text.strip())
@@ -2949,19 +3004,19 @@ class RocomPlugin(Star):
                 results = await self.client.query_pet_size(height_m if height_m is not None else height / 100, weight)
                 if results is not None:
                     data = self.egg_searcher.build_size_search_data_from_api(
-                        height, weight, results, height_display=height_display
+                        height, weight, results
                     )
                     text_result = self.egg_searcher.build_size_search_text_from_api(
-                        height, weight, results, height_display=height_display
+                        height, weight, results
                     )
 
             if data is None:
                 results = self.egg_searcher.search_by_size(height=height, weight=weight)
                 data = self.egg_searcher.build_size_search_data(
-                    height, weight, results, height_display=height_display
+                    height, weight, results
                 )
                 text_result = self.egg_searcher.build_size_search_text(
-                    height, weight, results, height_display=height_display
+                    height, weight, results
                 )
 
             img_url = await self.renderer.render_html("render/searcheggs/size.html", data)
