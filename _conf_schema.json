@@ -1,14 +1,14 @@
 {
   "wegame_api_key": {
     "type": "string",
-    "description": "WeGame API Key",
-    "hint": "用于访问 WeGame API 的开发者密钥",
+    "description": "API Key",
+    "hint": "用于访问 WeGame作用域的 API 的密钥，请暂时使用测试key，加群等待前端完毕后用正式key",
     "default": ""
   },
   "api_base_url": {
     "type": "string",
     "description": "API 基础地址",
-    "hint": "WeGame API 服务器地址",
+    "hint": "API 服务器地址，不要动",
     "default": "https://wegame.shallow.ink"
   },
   "render_timeout": {
