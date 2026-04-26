@@ -89,17 +89,29 @@ class RocomClient:
             headers["X-User-Identifier"] = self._sanitize_uid(user_identifier)
         return headers
 
-    async def _get(
-        self, path: str, headers: Dict[str, str], params: Optional[Dict] = None
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        headers: Dict[str, str],
+        params: Optional[Dict] = None,
+        json_data: Optional[Dict] = None,
     ) -> Optional[Dict]:
         try:
             self._clear_last_error()
             client = await self._get_client()
-            resp = await client.get(
-                f"{self.base_url}{path}", headers=headers, params=params
-            )
-            
-            # 检查响应状态码
+
+            if method == "GET":
+                resp = await client.get(f"{self.base_url}{path}", headers=headers, params=params)
+            elif method == "POST":
+                resp = await client.post(f"{self.base_url}{path}", headers=headers, json=json_data, params=params)
+            elif method == "DELETE":
+                resp = await client.delete(f"{self.base_url}{path}", headers=headers)
+            else:
+                logger.error(f"[Rocom API] 不支持的 HTTP 方法: {method}")
+                self._set_last_error(f"不支持的 HTTP 方法: {method}")
+                return None
+
             if resp.status_code != 200:
                 body_hint = resp.text[:300] if resp.text else ""
                 try:
@@ -110,21 +122,19 @@ class RocomClient:
                 logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code} {body_hint}")
                 self._set_last_error(f"HTTP {resp.status_code}: {body_hint}".strip(": "))
                 return None
-            
-            # 检查响应内容是否为空
+
             if not resp.text or not resp.text.strip():
                 logger.warning(f"[Rocom API] {path} 响应为空")
                 self._set_last_error("响应为空")
                 return None
-            
-            # 安全解析 JSON
+
             try:
                 data = resp.json()
             except Exception as json_err:
                 logger.warning(f"[Rocom API] {path} JSON 解析失败: {json_err}, 响应内容: {resp.text[:200]}")
                 self._set_last_error("JSON 解析失败")
                 return None
-            
+
             if data.get("code") != 0:
                 err_message = data.get("message", "未知")
                 logger.warning(f"[Rocom API] {path} 错误: {err_message}")
@@ -132,17 +142,22 @@ class RocomClient:
                 return None
             return data.get("data", {})
         except httpx.TimeoutException:
-            logger.error(f"[Rocom API] GET {path} 请求超时")
+            logger.error(f"[Rocom API] {method} {path} 请求超时")
             self._set_last_error("请求超时")
             return None
         except httpx.RequestError as e:
-            logger.error(f"[Rocom API] GET {path} 请求失败: {e}")
+            logger.error(f"[Rocom API] {method} {path} 请求失败: {e}")
             self._set_last_error(f"请求失败: {e}")
             return None
         except Exception as e:
-            logger.error(f"[Rocom API] GET {path} 异常: {e}")
+            logger.error(f"[Rocom API] {method} {path} 异常: {e}")
             self._set_last_error(f"异常: {e}")
             return None
+
+    async def _get(
+        self, path: str, headers: Dict[str, str], params: Optional[Dict] = None
+    ) -> Optional[Dict]:
+        return await self._request("GET", path, headers, params=params)
 
     async def _post(
         self,
@@ -151,113 +166,12 @@ class RocomClient:
         json_data: Optional[Dict] = None,
         params: Optional[Dict] = None,
     ) -> Optional[Dict]:
-        try:
-            self._clear_last_error()
-            client = await self._get_client()
-            resp = await client.post(
-                f"{self.base_url}{path}",
-                headers=headers,
-                json=json_data,
-                params=params,
-            )
-            
-            # 检查响应状态码
-            if resp.status_code != 200:
-                body_hint = resp.text[:300] if resp.text else ""
-                try:
-                    body_json = resp.json()
-                    body_hint = body_json.get("message") or body_hint
-                except Exception:
-                    pass
-                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code} {body_hint}")
-                self._set_last_error(f"HTTP {resp.status_code}: {body_hint}".strip(": "))
-                return None
-            
-            # 检查响应内容是否为空
-            if not resp.text or not resp.text.strip():
-                logger.warning(f"[Rocom API] {path} 响应为空")
-                self._set_last_error("响应为空")
-                return None
-            
-            # 安全解析 JSON
-            try:
-                data = resp.json()
-            except Exception as json_err:
-                logger.warning(f"[Rocom API] {path} JSON 解析失败: {json_err}, 响应内容: {resp.text[:200]}")
-                self._set_last_error("JSON 解析失败")
-                return None
-            
-            if data.get("code") != 0:
-                err_message = data.get("message", "未知")
-                logger.warning(f"[Rocom API] {path} 错误: {err_message}")
-                self._set_last_error(str(err_message))
-                return None
-            return data.get("data", {})
-        except httpx.TimeoutException:
-            logger.error(f"[Rocom API] POST {path} 请求超时")
-            self._set_last_error("请求超时")
-            return None
-        except httpx.RequestError as e:
-            logger.error(f"[Rocom API] POST {path} 请求失败: {e}")
-            self._set_last_error(f"请求失败: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"[Rocom API] POST {path} 异常: {e}")
-            self._set_last_error(f"异常: {e}")
-            return None
+        return await self._request("POST", path, headers, params=params, json_data=json_data)
 
     async def _delete(
         self, path: str, headers: Dict[str, str]
     ) -> Optional[Dict]:
-        try:
-            self._clear_last_error()
-            client = await self._get_client()
-            resp = await client.delete(f"{self.base_url}{path}", headers=headers)
-            
-            # 检查响应状态码
-            if resp.status_code != 200:
-                body_hint = resp.text[:300] if resp.text else ""
-                try:
-                    body_json = resp.json()
-                    body_hint = body_json.get("message") or body_hint
-                except Exception:
-                    pass
-                logger.warning(f"[Rocom API] {path} HTTP 错误: {resp.status_code} {body_hint}")
-                self._set_last_error(f"HTTP {resp.status_code}: {body_hint}".strip(": "))
-                return None
-            
-            # 检查响应内容是否为空
-            if not resp.text or not resp.text.strip():
-                logger.warning(f"[Rocom API] {path} 响应为空")
-                self._set_last_error("响应为空")
-                return None
-            
-            # 安全解析 JSON
-            try:
-                data = resp.json()
-            except Exception as json_err:
-                logger.warning(f"[Rocom API] {path} JSON 解析失败: {json_err}, 响应内容: {resp.text[:200]}")
-                self._set_last_error("JSON 解析失败")
-                return None
-            
-            if data.get("code") != 0:
-                err_message = data.get("message", "未知")
-                logger.warning(f"[Rocom API] {path} 错误: {err_message}")
-                self._set_last_error(str(err_message))
-                return None
-            return data.get("data", {})
-        except httpx.TimeoutException:
-            logger.error(f"[Rocom API] DELETE {path} 请求超时")
-            self._set_last_error("请求超时")
-            return None
-        except httpx.RequestError as e:
-            logger.error(f"[Rocom API] DELETE {path} 请求失败: {e}")
-            self._set_last_error(f"请求失败: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"[Rocom API] DELETE {path} 异常: {e}")
-            self._set_last_error(f"异常: {e}")
-            return None
+        return await self._request("DELETE", path, headers)
 
     # ─── 登录相关 ───
 
