@@ -58,5 +58,11 @@
     "items": {
       "type": "string"
     }
+  },
+  "merchant_private_subscription_enabled": {
+    "type": "bool",
+    "description": "允许个人私聊订阅远行商人",
+    "hint": "开启后允许用户在私聊中订阅远行商人推送",
+    "default": true
   }
 }

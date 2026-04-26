@@ -57,6 +57,9 @@ class RocomPlugin(Star):
         self.merchant_subscription_items = self.config.get(
             "merchant_subscription_items", ["国王球", "棱镜球", "炫彩精灵蛋"]
         )
+        self.merchant_private_subscription_enabled = self.config.get(
+            "merchant_private_subscription_enabled", True
+        )
         self._merchant_subscription_task = None
         self._merchant_retry_delay_seconds = 240
         self._merchant_retry_times = 3
@@ -2635,10 +2638,13 @@ class RocomPlugin(Star):
     @filter.command("订阅远行商人")
     async def subscribe_merchant(self, event: AstrMessageEvent, args: str = ""):
         """订阅远行商人商品提醒"""
-        if event.is_private_chat():
-            yield event.plain_result("该命令仅支持群聊使用。")
+        # 检查私聊订阅是否启用
+        if event.is_private_chat() and not self.merchant_private_subscription_enabled:
+            yield event.plain_result("个人私聊订阅功能已被禁用，请联系机器人管理员。")
             return
-        if not await self._is_group_admin(event):
+        
+        # 检查权限：群聊需要管理员，私聊无权限限制
+        if not event.is_private_chat() and not await self._is_group_admin(event):
             yield event.plain_result("仅当前群管理员可以配置远行商人订阅。")
             return
         
@@ -2652,11 +2658,20 @@ class RocomPlugin(Star):
         mention, custom_items = self._parse_merchant_subscription_args(args_text)
         # custom_items 为 None 时使用默认配置，否则使用自定义商品
         selected_items = list(custom_items) if custom_items is not None else list(self.merchant_subscription_items)
-        group_id = str(event.get_group_id())
+        
+        # 生成唯一订阅键：私聊用 user_id，群聊用 group_id
+        if event.is_private_chat():
+            subscription_key = f"private_{event.get_sender_id()}"
+            subscription_type = "个人订阅"
+        else:
+            subscription_key = str(event.get_group_id())
+            subscription_type = "群订阅"
+        
         await self.merchant_sub_mgr.upsert_subscription(
-            group_id,
+            subscription_key,
             {
-                "group_id": group_id,
+                "key": subscription_key,
+                "type": subscription_type,
                 "umo": event.unified_msg_origin,
                 "mention_all": mention,
                 "items": selected_items,
@@ -2665,29 +2680,40 @@ class RocomPlugin(Star):
                 "updated_by": str(event.get_sender_id()),
             },
         )
-        source_hint = "本群自定义商品" if custom_items is not None else "WebUI 默认商品"
+        source_hint = "自定义商品" if custom_items is not None else "WebUI 默认商品"
+        mention_hint = f"命中后{'会' if mention else '不会'}@全体" if not event.is_private_chat() else ""
         yield event.plain_result(
-            f"已订阅远行商人，监听商品：{'、'.join(selected_items)}（{source_hint}）；"
-            f"命中后{'会' if mention else '不会'}@全体。\n"
-            f"订阅方式：/订阅远行商人 1 为 @全体，/订阅远行商人 0 为不@全体，"
-            f"/订阅远行商人 1 国王球 棱镜球 为本群自定义商品，"
+            f"已订阅远行商人，监听商品：{'、'.join(selected_items)}（{source_hint}）；{mention_hint}\n"
+            f"订阅方式：/订阅远行商人 1 为 @全体（仅群聊），/订阅远行商人 0 为不@全体，"
+            f"/订阅远行商人 1 国王球 棱镜球 为自定义商品，"
             f"/取消订阅远行商人 可关闭订阅。"
         )
 
     @filter.command("取消订阅远行商人")
     async def unsubscribe_merchant(self, event: AstrMessageEvent):
         """取消远行商人商品提醒"""
-        if event.is_private_chat():
-            yield event.plain_result("该命令仅支持群聊使用。")
-            return
-        if not await self._is_group_admin(event):
+        # 检查私聊订阅是否启用（即使禁用，也应该允许取消已有的订阅）
+        if event.is_private_chat() and not self.merchant_private_subscription_enabled:
+            yield event.plain_result("个人私聊订阅功能已被禁用，但仍可取消已有订阅。")
+        
+        # 检查权限：群聊需要管理员，私聊无权限限制
+        if not event.is_private_chat() and not await self._is_group_admin(event):
             yield event.plain_result("仅当前群管理员可以取消远行商人订阅。")
             return
-        deleted = await self.merchant_sub_mgr.delete_subscription(str(event.get_group_id()))
-        if deleted:
-            yield event.plain_result("已取消本群远行商人订阅。")
+        
+        # 确定订阅键
+        if event.is_private_chat():
+            subscription_key = f"private_{event.get_sender_id()}"
+            subscription_name = "你的个人"
         else:
-            yield event.plain_result("本群当前没有远行商人订阅。")
+            subscription_key = str(event.get_group_id())
+            subscription_name = "本群"
+        
+        deleted = await self.merchant_sub_mgr.delete_subscription(subscription_key)
+        if deleted:
+            yield event.plain_result(f"已取消{subscription_name}远行商人订阅。")
+        else:
+            yield event.plain_result(f"{subscription_name}当前没有远行商人订阅。")
     @filter.command("洛克交换大厅", alias={"洛克大厅", "交换大厅"})
     async def rocom_exchange_hall(self, event: AstrMessageEvent, page: str = "1"):
         """查看交换大厅"""
